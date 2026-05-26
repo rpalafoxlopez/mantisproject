@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: critical-thinking-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://your-frontend-url.vercel.app
+      - key: MONGODB_URI
+        sync: false # Set this in Render dashboard
