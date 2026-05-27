@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: #f5f6ff;
+    color: #1b2e51;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-sm transition-all duration-200 cursor-pointer border-none;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-secondary text-white shadow-lg shadow-primary/20;
+  }
+  .btn-primary:hover {
+    @apply -translate-y-0.5 shadow-xl shadow-primary/30;
+  }
+
+  .btn-secondary {
+    @apply bg-white text-primary border-2 border-primary;
+  }
+  .btn-secondary:hover {
+    @apply bg-primary text-white;
+  }
+
+  .btn-danger {
+    @apply bg-gradient-to-r from-red-500 to-pink-500 text-white;
+  }
+
+  .btn-success {
+    @apply bg-gradient-to-r from-green-500 to-emerald-500 text-white;
+  }
+
+  .card {
+    @apply bg-white rounded-xl p-6 shadow-sm border border-border-subtle;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 rounded-lg border border-border-subtle text-sm font-sans transition-all duration-200 bg-white;
+  }
+  .input:focus {
+    @apply outline-none border-primary ring-2 ring-primary/10;
+  }
+
+  .error-text {
+    @apply text-error text-sm font-medium flex items-center gap-2;
+  }
+
+  .spinner {
+    @apply w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin;
+  }
+}

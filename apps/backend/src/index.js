@@ -15,10 +15,30 @@ dotenv.config();
 const app = express();
 const httpServer = createServer(app);
 
-// CORS
+// CORS - Allow multiple origins
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'https://quizhive.rpalafox.com',
+  'https://mantisproject-gfkbij3wz-rpalafoxlopezs-projects.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, etc.)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin) || allowedOrigins.some(allowed => origin.includes(allowed))) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(express.json());
@@ -41,7 +61,7 @@ app.get('/health', (req, res) => {
 // Socket.io
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
@@ -52,4 +72,5 @@ setupGameSocket(io);
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
   console.log(`🐝 QuizHive API running on port ${PORT}`);
+  console.log(`🐝 Allowed origins: ${allowedOrigins.join(', ')}`);
 });
