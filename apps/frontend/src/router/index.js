@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth.js'
 
 const routes = [
   {
@@ -7,15 +8,29 @@ const routes = [
     component: () => import('@/views/HomeView.vue')
   },
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/LoginView.vue'),
+    meta: { guestOnly: true }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { guestOnly: true }
+  },
+  {
     path: '/admin',
     name: 'Admin',
-    component: () => import('@/views/AdminView.vue')
+    component: () => import('@/views/AdminView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
     path: '/host/:sessionCode?',
     name: 'Host',
     component: () => import('@/views/HostView.vue'),
-    props: true
+    props: true,
+    meta: { requiresAuth: true }
   },
   {
     path: '/join',
@@ -39,6 +54,28 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Navigation guards
+router.beforeEach((to, from, next) => {
+  const authStore = useAuthStore()
+
+  // Redirect authenticated users away from login/register
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return next('/')
+  }
+
+  // Require auth
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return next('/login')
+  }
+
+  // Require admin
+  if (to.meta.requiresAdmin && !authStore.isAdmin) {
+    return next('/')
+  }
+
+  next()
 })
 
 export default router

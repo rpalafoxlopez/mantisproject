@@ -5,6 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
+import authRoutes from './routes/auth.js';
 import questionRoutes from './routes/questions.js';
 import sessionRoutes from './routes/sessions.js';
 import { setupGameSocket } from './socket/gameSocket.js';
@@ -23,17 +24,18 @@ app.use(cors({
 app.use(express.json());
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/critical-thinking-game')
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/quizhive')
   .then(() => console.log('✅ MongoDB connected'))
   .catch(err => console.error('❌ MongoDB error:', err));
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/sessions', sessionRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', app: 'QuizHive API', timestamp: new Date().toISOString() });
 });
 
 // Socket.io
@@ -47,7 +49,7 @@ const io = new Server(httpServer, {
 
 setupGameSocket(io);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🐝 QuizHive API running on port ${PORT}`);
 });

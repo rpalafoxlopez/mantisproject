@@ -1,57 +1,81 @@
 <template>
-  <div class="join-view">
-    <div class="join-card card">
-      <h1>🎮 Unirse a Partida</h1>
-      <p class="subtitle">Ingresa el código de sala y tu nombre</p>
-
-      <div class="form-group">
-        <label>Código de Sala</label>
-        <input 
-          v-model="sessionCode" 
-          class="input code-input"
-          placeholder="Ej: AB2D"
-          maxlength="4"
-          @input="sessionCode = sessionCode.toUpperCase()"
-        />
+  <div class="min-h-screen flex items-center justify-center bg-background px-4">
+    <div class="w-full max-w-md">
+      <!-- Logo -->
+      <div class="text-center mb-8">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-secondary/10 text-secondary mb-4">
+          <span class="material-symbols-outlined text-3xl">group</span>
+        </div>
+        <h1 class="text-2xl font-bold text-primary">Unirse a Partida</h1>
+        <p class="text-on-surface-variant mt-2">Ingresa el código y prepárate para competir</p>
       </div>
 
-      <div class="form-group">
-        <label>Tu Nombre</label>
-        <input 
-          v-model="playerName" 
-          class="input"
-          placeholder="¿Cómo te llamas?"
-          maxlength="20"
-        />
-      </div>
+      <div class="card p-8">
+        <form @submit.prevent="joinGame" class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-on-surface mb-1.5">Código de Sala</label>
+            <input 
+              v-model="sessionCode" 
+              class="input text-center text-2xl font-black tracking-widest uppercase"
+              placeholder="AB2D"
+              maxlength="4"
+              @input="sessionCode = sessionCode.toUpperCase().replace(/[^A-Z0-9]/g, '')"
+              required
+            />
+          </div>
 
-      <div class="form-group">
-        <label>Elige tu Avatar</label>
-        <div class="avatar-selector">
-          <button
-            v-for="avatar in avatars"
-            :key="avatar"
-            class="avatar-btn"
-            :class="{ selected: selectedAvatar === avatar }"
-            @click="selectedAvatar = avatar"
+          <div>
+            <label class="block text-sm font-medium text-on-surface mb-1.5">Tu Nombre</label>
+            <input 
+              v-model="playerName" 
+              class="input"
+              placeholder="¿Cómo te llamas?"
+              maxlength="20"
+              required
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-on-surface mb-1.5">Elige tu Avatar</label>
+            <div class="grid grid-cols-5 gap-2">
+              <button
+                v-for="avatar in avatars"
+                :key="avatar"
+                type="button"
+                class="h-12 rounded-xl border-2 text-xl transition-all hover:scale-110"
+                :class="selectedAvatar === avatar ? 'border-secondary bg-secondary/10' : 'border-gray-200 hover:border-secondary/50'"
+                @click="selectedAvatar = avatar"
+              >
+                {{ avatar }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="error" class="error-text flex items-center gap-2">
+            <span class="material-symbols-outlined text-sm">error</span>
+            {{ error }}
+          </div>
+
+          <button 
+            type="submit"
+            class="btn btn-primary w-full"
+            :disabled="!canJoin || joining"
           >
-            {{ avatar }}
+            <span v-if="joining" class="spinner"></span>
+            <span v-else class="flex items-center gap-2">
+              <span class="material-symbols-outlined">login</span>
+              ¡Entrar!
+            </span>
           </button>
+        </form>
+
+        <div class="mt-6 text-center">
+          <router-link to="/" class="text-sm text-on-surface-variant hover:text-secondary transition-colors flex items-center justify-center gap-1">
+            <span class="material-symbols-outlined text-base">arrow_back</span>
+            Volver al inicio
+          </router-link>
         </div>
       </div>
-
-      <div v-if="error" class="error">{{ error }}</div>
-
-      <button 
-        class="btn btn-primary btn-full"
-        :disabled="!canJoin || joining"
-        @click="joinGame"
-      >
-        <span v-if="joining" class="spinner-small"></span>
-        <span v-else>¡Entrar!</span>
-      </button>
-
-      <router-link to="/" class="back-link">← Volver al inicio</router-link>
     </div>
   </div>
 </template>
@@ -113,111 +137,3 @@ function joinGame() {
   })
 }
 </script>
-
-<style scoped>
-.join-view {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 80vh;
-  padding: 2rem;
-}
-
-.join-card {
-  width: 100%;
-  max-width: 450px;
-  text-align: center;
-}
-
-.join-card h1 {
-  color: #667eea;
-  margin-bottom: 0.5rem;
-  font-size: 2rem;
-}
-
-.subtitle {
-  color: #888;
-  margin-bottom: 2rem;
-}
-
-.form-group {
-  margin-bottom: 1.5rem;
-  text-align: left;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #555;
-  font-size: 0.9rem;
-}
-
-.code-input {
-  text-align: center;
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: 0.5rem;
-  text-transform: uppercase;
-}
-
-.avatar-selector {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 0.5rem;
-}
-
-.avatar-btn {
-  width: 50px;
-  height: 50px;
-  border: 2px solid #e0e0e0;
-  border-radius: 12px;
-  background: white;
-  font-size: 1.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.avatar-btn:hover {
-  border-color: #667eea;
-  transform: scale(1.1);
-}
-
-.avatar-btn.selected {
-  border-color: #667eea;
-  background: linear-gradient(135deg, #667eea20, #764ba220);
-  transform: scale(1.1);
-}
-
-.btn-full {
-  width: 100%;
-  margin-top: 1rem;
-}
-
-.btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.spinner-small {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.back-link {
-  display: block;
-  margin-top: 1.5rem;
-  color: #888;
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.back-link:hover {
-  color: #667eea;
-}
-</style>

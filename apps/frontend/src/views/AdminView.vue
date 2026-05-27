@@ -1,159 +1,209 @@
 <template>
-  <div class="admin-view">
-    <div class="admin-header">
-      <h1>⚙️ Panel de Administración</h1>
-      <p>Gestiona las preguntas del juego de Pensamiento Crítico</p>
-    </div>
-
-    <div class="admin-content">
-      <!-- Form to add/edit question -->
-      <div class="question-form card">
-        <h2>{{ editingId ? '✏️ Editar Pregunta' : '➕ Nueva Pregunta' }}</h2>
-
-        <div class="form-group">
-          <label>Pregunta</label>
-          <textarea 
-            v-model="form.question" 
-            class="input"
-            rows="3"
-            placeholder="Escribe la pregunta..."
-          ></textarea>
-        </div>
-
-        <div class="form-group">
-          <label>Opciones (mínimo 2)</label>
-          <div class="options-inputs">
-            <div v-for="(opt, i) in form.options" :key="i" class="option-input-row">
-              <input 
-                v-model="form.options[i]" 
-                class="input"
-                :placeholder="'Opción ' + (i + 1)"
-              />
-              <button 
-                v-if="form.options.length > 2" 
-                class="btn-remove"
-                @click="removeOption(i)"
-              >
-                ✕
-              </button>
-            </div>
-            <button class="btn-add-option" @click="addOption">
-              + Agregar opción
-            </button>
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Respuesta Correcta</label>
-            <select v-model="form.correctAnswer" class="input">
-              <option v-for="(opt, i) in form.options" :key="i" :value="i">
-                {{ ['A','B','C','D','E'][i] }} - {{ opt || 'Opción ' + (i + 1) }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Categoría</label>
-            <input v-model="form.category" class="input" placeholder="Pensamiento Crítico" />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="form-group">
-            <label>Dificultad</label>
-            <select v-model="form.difficulty" class="input">
-              <option value="easy">Fácil</option>
-              <option value="medium">Media</option>
-              <option value="hard">Difícil</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Tiempo (segundos)</label>
-            <input 
-              v-model.number="form.timeLimit" 
-              type="number" 
-              class="input"
-              min="5"
-              max="120"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Puntos base</label>
-            <input 
-              v-model.number="form.points" 
-              type="number" 
-              class="input"
-              min="10"
-              max="1000"
-            />
-          </div>
-        </div>
-
-        <div v-if="formError" class="error">{{ formError }}</div>
-
-        <div class="form-actions">
-          <button class="btn btn-primary" @click="saveQuestion" :disabled="saving">
-            {{ saving ? 'Guardando...' : (editingId ? 'Actualizar' : 'Guardar') }}
-          </button>
-          <button v-if="editingId" class="btn btn-secondary" @click="cancelEdit">
-            Cancelar
-          </button>
-        </div>
+  <div class="min-h-screen bg-background py-8 px-4 lg:px-10">
+    <div class="max-w-6xl mx-auto">
+      <!-- Header -->
+      <div class="mb-8">
+        <h1 class="text-3xl font-bold text-primary flex items-center gap-3">
+          <span class="material-symbols-outlined text-secondary">settings</span>
+          Panel de Administración
+        </h1>
+        <p class="text-on-surface-variant mt-2">Gestiona las preguntas del juego. Máximo 25 preguntas por sesión.</p>
       </div>
 
-      <!-- Questions list -->
-      <div class="questions-list card">
-        <div class="list-header">
-          <h2>📋 Preguntas ({{ questions.length }})</h2>
-          <div class="list-filters">
-            <input 
-              v-model="searchQuery" 
-              class="input search-input"
-              placeholder="🔍 Buscar pregunta..."
-            />
+      <div class="grid lg:grid-cols-5 gap-8">
+        <!-- Form -->
+        <div class="lg:col-span-2">
+          <div class="card sticky top-24">
+            <h2 class="text-lg font-semibold text-primary mb-6 flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">{{ editingId ? 'edit' : 'add_circle' }}</span>
+              {{ editingId ? 'Editar Pregunta' : 'Nueva Pregunta' }}
+            </h2>
+
+            <form @submit.prevent="saveQuestion" class="space-y-4">
+              <div>
+                <label class="block text-sm font-medium text-on-surface mb-1.5">Pregunta</label>
+                <textarea 
+                  v-model="form.question" 
+                  class="input"
+                  rows="3"
+                  placeholder="Escribe la pregunta..."
+                  required
+                ></textarea>
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-on-surface mb-1.5">Opciones</label>
+                <div class="space-y-2">
+                  <div v-for="(opt, i) in form.options" :key="i" class="flex gap-2">
+                    <input 
+                      v-model="form.options[i]" 
+                      class="input"
+                      :placeholder="'Opción ' + (i + 1)"
+                      required
+                    />
+                    <button 
+                      v-if="form.options.length > 2" 
+                      type="button"
+                      class="text-error hover:bg-error/10 px-2 rounded-lg transition-colors"
+                      @click="removeOption(i)"
+                    >
+                      <span class="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                  <button 
+                    type="button"
+                    class="text-sm text-secondary font-medium flex items-center gap-1 hover:underline"
+                    @click="addOption"
+                  >
+                    <span class="material-symbols-outlined text-base">add</span>
+                    Agregar opción
+                  </button>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-on-surface mb-1.5">Respuesta Correcta</label>
+                  <select v-model="form.correctAnswer" class="input">
+                    <option v-for="(opt, i) in form.options" :key="i" :value="i">
+                      {{ ['A','B','C','D','E'][i] }} - {{ opt || 'Opción ' + (i + 1) }}
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-medium text-on-surface mb-1.5">Dificultad</label>
+                  <select v-model="form.difficulty" class="input">
+                    <option value="easy">Fácil</option>
+                    <option value="medium">Media</option>
+                    <option value="hard">Difícil</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-on-surface mb-1.5">Tiempo (s)</label>
+                  <input 
+                    v-model.number="form.timeLimit" 
+                    type="number"
+                    class="input"
+                    min="5"
+                    max="120"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-on-surface mb-1.5">Puntos</label>
+                  <input 
+                    v-model.number="form.points" 
+                    type="number"
+                    class="input"
+                    min="10"
+                    max="1000"
+                  />
+                </div>
+              </div>
+
+              <div v-if="formError" class="error-text flex items-center gap-2">
+                <span class="material-symbols-outlined text-sm">error</span>
+                {{ formError }}
+              </div>
+
+              <div class="flex gap-3 pt-2">
+                <button 
+                  type="submit"
+                  class="btn btn-primary flex-1"
+                  :disabled="saving"
+                >
+                  <span v-if="saving" class="spinner"></span>
+                  <span v-else>{{ editingId ? 'Actualizar' : 'Guardar' }}</span>
+                </button>
+                <button 
+                  v-if="editingId"
+                  type="button"
+                  class="btn btn-secondary"
+                  @click="cancelEdit"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
 
-        <div v-if="loading" class="loading">
-          <div class="spinner"></div>
-        </div>
-
-        <div v-else-if="filteredQuestions.length === 0" class="empty-state">
-          <p>No hay preguntas. ¡Crea la primera!</p>
-        </div>
-
-        <div v-else class="question-items">
-          <div 
-            v-for="q in filteredQuestions" 
-            :key="q._id"
-            class="question-item"
-            :class="{ editing: editingId === q._id }"
-          >
-            <div class="q-header">
-              <span class="q-badge" :class="q.difficulty">{{ q.difficulty }}</span>
-              <span class="q-time">⏱️ {{ q.timeLimit }}s</span>
-              <span class="q-points">{{ q.points }} pts</span>
+        <!-- List -->
+        <div class="lg:col-span-3">
+          <div class="card">
+            <div class="flex justify-between items-center mb-6">
+              <h2 class="text-lg font-semibold text-primary">
+                Preguntas ({{ questions.length }})
+              </h2>
+              <div class="text-sm text-on-surface-variant">
+                <span class="material-symbols-outlined text-base align-middle">info</span>
+                Max 25 por sesión
+              </div>
             </div>
 
-            <p class="q-text">{{ q.question }}</p>
+            <div v-if="loading" class="flex justify-center py-12">
+              <div class="spinner border-4 border-gray-200 border-t-primary w-8 h-8"></div>
+            </div>
 
-            <div class="q-options">
-              <span 
-                v-for="(opt, i) in q.options" 
-                :key="i"
-                class="q-option"
-                :class="{ correct: i === q.correctAnswer }"
+            <div v-else-if="questions.length === 0" class="text-center py-12 text-on-surface-variant">
+              <span class="material-symbols-outlined text-4xl mb-3">quiz</span>
+              <p>No hay preguntas. ¡Crea la primera!</p>
+            </div>
+
+            <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+              <div 
+                v-for="q in questions" 
+                :key="q._id"
+                class="p-4 rounded-lg border transition-all"
+                :class="editingId === q._id ? 'border-secondary bg-secondary/5' : 'border-border-subtle hover:border-secondary/30'"
               >
-                {{ ['A','B','C','D','E'][i] }}. {{ opt }}
-              </span>
-            </div>
-
-            <div class="q-actions">
-              <button class="btn-edit" @click="editQuestion(q)">✏️ Editar</button>
-              <button class="btn-delete" @click="deleteQuestion(q._id)">🗑️ Eliminar</button>
+                <div class="flex items-start justify-between gap-4">
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-2">
+                      <span 
+                        class="px-2 py-0.5 rounded-full text-xs font-bold uppercase"
+                        :class="{
+                          'bg-green-100 text-green-700': q.difficulty === 'easy',
+                          'bg-yellow-100 text-yellow-700': q.difficulty === 'medium',
+                          'bg-red-100 text-red-700': q.difficulty === 'hard'
+                        }"
+                      >
+                        {{ q.difficulty }}
+                      </span>
+                      <span class="text-xs text-on-surface-variant">⏱️ {{ q.timeLimit }}s</span>
+                      <span class="text-xs text-on-surface-variant">{{ q.points }} pts</span>
+                    </div>
+                    <p class="font-medium text-on-surface text-sm mb-2">{{ q.question }}</p>
+                    <div class="flex flex-wrap gap-2">
+                      <span 
+                        v-for="(opt, i) in q.options" 
+                        :key="i"
+                        class="text-xs px-2 py-1 rounded-md"
+                        :class="i === q.correctAnswer ? 'bg-green-100 text-green-700 font-semibold' : 'bg-gray-100 text-gray-600'"
+                      >
+                        {{ ['A','B','C','D','E'][i] }}. {{ opt }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="flex gap-1 flex-shrink-0">
+                    <button 
+                      class="p-2 text-secondary hover:bg-secondary/10 rounded-lg transition-colors"
+                      @click="editQuestion(q)"
+                    >
+                      <span class="material-symbols-outlined text-lg">edit</span>
+                    </button>
+                    <button 
+                      class="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
+                      @click="deleteQuestion(q._id)"
+                    >
+                      <span class="material-symbols-outlined text-lg">delete</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -163,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
@@ -172,26 +222,15 @@ const questions = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const editingId = ref(null)
-const searchQuery = ref('')
 const formError = ref('')
 
-const form = ref({
+const form = reactive({
   question: '',
   options: ['', '', '', ''],
   correctAnswer: 0,
-  category: 'Pensamiento Crítico',
   difficulty: 'medium',
   timeLimit: 20,
   points: 100
-})
-
-const filteredQuestions = computed(() => {
-  if (!searchQuery.value) return questions.value
-  const q = searchQuery.value.toLowerCase()
-  return questions.value.filter(qs => 
-    qs.question.toLowerCase().includes(q) ||
-    qs.category.toLowerCase().includes(q)
-  )
 })
 
 onMounted(() => {
@@ -205,30 +244,31 @@ async function loadQuestions() {
     questions.value = res.data
   } catch (error) {
     console.error('Error loading questions:', error)
+    if (error.response?.status === 401) {
+      formError.value = 'Sesión expirada. Por favor inicia sesión de nuevo.'
+    }
   } finally {
     loading.value = false
   }
 }
 
 function addOption() {
-  form.value.options.push('')
+  if (form.options.length >= 5) return
+  form.options.push('')
 }
 
 function removeOption(index) {
-  if (form.value.options.length <= 2) return
-  form.value.options.splice(index, 1)
-  if (form.value.correctAnswer >= form.value.options.length) {
-    form.value.correctAnswer = form.value.options.length - 1
+  if (form.options.length <= 2) return
+  form.options.splice(index, 1)
+  if (form.correctAnswer >= form.options.length) {
+    form.correctAnswer = form.options.length - 1
   }
 }
 
 function validateForm() {
-  if (!form.value.question.trim()) return 'La pregunta es obligatoria'
-  if (form.value.options.some(o => !o.trim())) return 'Todas las opciones deben tener texto'
-  if (form.value.options.length < 2) return 'Mínimo 2 opciones'
-  if (form.value.correctAnswer < 0 || form.value.correctAnswer >= form.value.options.length) {
-    return 'Selecciona una respuesta correcta válida'
-  }
+  if (!form.question.trim()) return 'La pregunta es obligatoria'
+  if (form.options.some(o => !o.trim())) return 'Todas las opciones deben tener texto'
+  if (form.options.length < 2) return 'Mínimo 2 opciones'
   return null
 }
 
@@ -243,8 +283,8 @@ async function saveQuestion() {
 
   try {
     const payload = {
-      ...form.value,
-      options: form.value.options.filter(o => o.trim())
+      ...form,
+      options: form.options.filter(o => o.trim())
     }
 
     if (editingId.value) {
@@ -255,8 +295,11 @@ async function saveQuestion() {
 
     resetForm()
     await loadQuestions()
-  } catch (error) {
-    formError.value = error.response?.data?.error || 'Error al guardar'
+  } catch (err) {
+    formError.value = err.response?.data?.error || 'Error al guardar'
+    if (err.response?.status === 401) {
+      formError.value = 'No autorizado. Solo administradores pueden gestionar preguntas.'
+    }
   } finally {
     saving.value = false
   }
@@ -264,15 +307,12 @@ async function saveQuestion() {
 
 function editQuestion(q) {
   editingId.value = q._id
-  form.value = {
-    question: q.question,
-    options: [...q.options],
-    correctAnswer: q.correctAnswer,
-    category: q.category,
-    difficulty: q.difficulty,
-    timeLimit: q.timeLimit,
-    points: q.points
-  }
+  form.question = q.question
+  form.options = [...q.options]
+  form.correctAnswer = q.correctAnswer
+  form.difficulty = q.difficulty
+  form.timeLimit = q.timeLimit
+  form.points = q.points
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -282,15 +322,12 @@ function cancelEdit() {
 
 function resetForm() {
   editingId.value = null
-  form.value = {
-    question: '',
-    options: ['', '', '', ''],
-    correctAnswer: 0,
-    category: 'Pensamiento Crítico',
-    difficulty: 'medium',
-    timeLimit: 20,
-    points: 100
-  }
+  form.question = ''
+  form.options = ['', '', '', '']
+  form.correctAnswer = 0
+  form.difficulty = 'medium'
+  form.timeLimit = 20
+  form.points = 100
   formError.value = ''
 }
 
@@ -299,251 +336,8 @@ async function deleteQuestion(id) {
   try {
     await axios.delete(`${API_URL}/api/questions/${id}`)
     await loadQuestions()
-  } catch (error) {
-    console.error('Error deleting:', error)
+  } catch (err) {
+    alert(err.response?.data?.error || 'Error al eliminar')
   }
 }
 </script>
-
-<style scoped>
-.admin-view {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-.admin-header {
-  text-align: center;
-  margin-bottom: 2rem;
-  color: white;
-}
-
-.admin-header h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.admin-header p {
-  opacity: 0.8;
-}
-
-.admin-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
-}
-
-.question-form h2 {
-  color: #667eea;
-  margin-bottom: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1.25rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #555;
-  font-size: 0.9rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
-}
-
-.options-inputs {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.option-input-row {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.option-input-row .input {
-  flex: 1;
-}
-
-.btn-remove {
-  background: #f5576c;
-  color: white;
-  border: none;
-  border-radius: 10px;
-  width: 40px;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.btn-add-option {
-  background: transparent;
-  border: 2px dashed #667eea;
-  color: #667eea;
-  padding: 0.75rem;
-  border-radius: 10px;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.3s;
-}
-
-.btn-add-option:hover {
-  background: #667eea10;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.questions-list {
-  margin-top: 1rem;
-}
-
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.list-header h2 {
-  color: #667eea;
-}
-
-.search-input {
-  width: 250px;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 3rem;
-  color: #888;
-}
-
-.question-items {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.question-item {
-  background: #f8f9fa;
-  border-radius: 15px;
-  padding: 1.25rem;
-  border: 2px solid transparent;
-  transition: all 0.3s;
-}
-
-.question-item.editing {
-  border-color: #667eea;
-  background: linear-gradient(135deg, #667eea08, #764ba208);
-}
-
-.q-header {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 0.75rem;
-  align-items: center;
-}
-
-.q-badge {
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.q-badge.easy { background: #4facfe30; color: #4facfe; }
-.q-badge.medium { background: #ffe66d30; color: #b8860b; }
-.q-badge.hard { background: #f5576c30; color: #f5576c; }
-
-.q-time, .q-points {
-  font-size: 0.85rem;
-  color: #888;
-}
-
-.q-text {
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 0.75rem;
-  font-size: 1.05rem;
-}
-
-.q-options {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-}
-
-.q-option {
-  font-size: 0.9rem;
-  color: #666;
-  padding: 0.3rem 0.75rem;
-  border-radius: 8px;
-}
-
-.q-option.correct {
-  background: linear-gradient(135deg, #4facfe20, #00f2fe20);
-  color: #4facfe;
-  font-weight: 700;
-}
-
-.q-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.q-actions button {
-  padding: 0.5rem 1rem;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.btn-edit {
-  background: #667eea20;
-  color: #667eea;
-}
-
-.btn-edit:hover {
-  background: #667eea;
-  color: white;
-}
-
-.btn-delete {
-  background: #f5576c20;
-  color: #f5576c;
-}
-
-.btn-delete:hover {
-  background: #f5576c;
-  color: white;
-}
-
-@media (max-width: 768px) {
-  .list-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .search-input {
-    width: 100%;
-  }
-  .form-row {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

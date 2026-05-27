@@ -1,7 +1,7 @@
 {
-  "name": "critical-thinking-frontend",
+  "name": "quizhive-frontend",
   "version": "1.0.0",
-  "description": "Frontend for Critical Thinking Game - Vue 3 + Vite",
+  "description": "QuizHive - Enterprise quiz platform frontend",
   "type": "module",
   "scripts": {
     "dev": "vite",

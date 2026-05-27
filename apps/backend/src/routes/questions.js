@@ -1,9 +1,10 @@
 import express from 'express';
 import Question from '../models/Question.js';
+import { authenticate, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Get all questions
+// Get all questions (public)
 router.get('/', async (req, res) => {
   try {
     const questions = await Question.find().sort({ createdAt: -1 });
@@ -13,7 +14,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single question
+// Get single question (public)
 router.get('/:id', async (req, res) => {
   try {
     const question = await Question.findById(req.params.id);
@@ -24,12 +25,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Create question (Admin)
-router.post('/', async (req, res) => {
+// Create question (requires auth, admin only)
+router.post('/', authenticate, requireAdmin, async (req, res) => {
   try {
     const { question, options, correctAnswer, category, difficulty, timeLimit, points } = req.body;
 
-    // Validation
     if (!question || !options || options.length < 2 || correctAnswer === undefined) {
       return res.status(400).json({ 
         error: 'Question, at least 2 options, and correctAnswer are required' 
@@ -57,8 +57,8 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Update question
-router.put('/:id', async (req, res) => {
+// Update question (requires auth, admin only)
+router.put('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const question = await Question.findByIdAndUpdate(
       req.params.id,
@@ -72,8 +72,8 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// Delete question
-router.delete('/:id', async (req, res) => {
+// Delete question (requires auth, admin only)
+router.delete('/:id', authenticate, requireAdmin, async (req, res) => {
   try {
     const question = await Question.findByIdAndDelete(req.params.id);
     if (!question) return res.status(404).json({ error: 'Question not found' });

@@ -1,56 +1,50 @@
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { authenticate } from '../middleware/auth.js';
+import { generateToken, authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // Register
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, displayName } = req.body;
+    const { email, password, name, role } = req.body;
 
-    // Check if user exists
-    const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
-    });
+    if (!email || !password || !name) {
+      return res.status(400).json({ error: 'Email, password and name are required' });
+    }
 
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      return res.status(400).json({
-        message: existingUser.email === email 
-          ? 'Email already registered' 
-          : 'Username already taken'
-      });
+      return res.status(409).json({ error: 'Email already registered' });
     }
 
     const user = new User({
-      username,
       email,
       password,
-      displayName: displayName || username,
-      role: 'host'
+      name,
+      role: role || 'host'
     });
 
     await user.save();
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    const token = generateToken(user._id);
 
     res.status(201).json({
       token,
       user: {
         id: user._id,
-        username: user.username,
         email: user.email,
-        displayName: user.displayName,
-        role: user.role
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -59,34 +53,39 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const isMatch = await user.comparePassword(password);
+
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid credentials' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    user.lastLogin = new Date();
+    await user.save();
+
+    const token = generateToken(user._id);
 
     res.json({
       token,
       user: {
         id: user._id,
-        username: user.username,
         email: user.email,
-        displayName: user.displayName,
-        role: user.role
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar
       }
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -95,14 +94,59 @@ router.get('/me', authenticate, async (req, res) => {
   res.json({
     user: {
       id: req.user._id,
-      username: req.user.username,
       email: req.user.email,
-      displayName: req.user.displayName,
+      name: req.user.name,
       role: req.user.role,
-      gamesPlayed: req.user.gamesPlayed,
-      totalScore: req.user.totalScore
+      avatar: req.user.avatar,
+      lastLogin: req.user.lastLogin
     }
   });
+});
+
+// Update profile
+router.put('/profile', authenticate, async (req, res) => {
+  try {
+    const { name, avatar } = req.body;
+    const updates = {};
+
+    if (name) updates.name = name;
+    if (avatar) updates.avatar = avatar;
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      updates,
+      { new: true }
+    ).select('-password');
+
+    res.json({ user });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Change password
+router.put('/password', authenticate, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Current password and new password (min 6 chars) required' });
+    }
+
+    const user = await User.findById(req.user._id);
+    const isMatch = await user.comparePassword(currentPassword);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Current password is incorrect' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 export default router;

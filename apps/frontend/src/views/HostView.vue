@@ -1,137 +1,183 @@
 <template>
-  <div class="host-view">
-    <!-- LOBBY: Esperando jugadores -->
-    <div v-if="gameStore.isWaiting" class="host-lobby">
-      <div class="lobby-header">
-        <h1>👑 Sala de Control</h1>
-        <div class="room-code">
-          <span class="code-label">CÓDIGO DE SALA</span>
-          <span class="code-value">{{ gameStore.sessionCode }}</span>
-          <button class="copy-btn" @click="copyCode">📋</button>
+  <div class="min-h-screen bg-background py-8 px-4 lg:px-10">
+    <div class="max-w-5xl mx-auto">
+      <!-- LOBBY -->
+      <div v-if="gameStore.isWaiting" class="space-y-6">
+        <!-- Header -->
+        <div class="text-center">
+          <h1 class="text-3xl font-bold text-primary flex items-center justify-center gap-3">
+            <span class="material-symbols-outlined text-secondary">hive</span>
+            Sala de Control
+          </h1>
         </div>
-      </div>
 
-      <div class="lobby-content">
-        <div class="players-section">
-          <h2>Jugadores Conectados ({{ gameStore.players.length }})</h2>
-          <div class="players-grid">
-            <div 
-              v-for="player in gameStore.players" 
-              :key="player.socketId"
-              class="player-card"
-              :class="{ disconnected: !player.connected }"
+        <!-- Room Code -->
+        <div class="flex justify-center">
+          <div class="bg-gradient-to-r from-primary to-secondary text-white px-8 py-6 rounded-2xl text-center shadow-lg">
+            <div class="text-sm opacity-80 uppercase tracking-wider mb-2">Código de Sala</div>
+            <div class="text-4xl font-black tracking-widest">{{ gameStore.sessionCode }}</div>
+            <button 
+              class="mt-3 text-sm bg-white/20 hover:bg-white/30 px-4 py-1.5 rounded-lg transition-colors flex items-center gap-2 mx-auto"
+              @click="copyCode"
             >
-              <span class="player-avatar">{{ player.avatar }}</span>
-              <span class="player-name">{{ player.name }}</span>
-              <span v-if="!player.connected" class="player-status">desconectado</span>
+              <span class="material-symbols-outlined text-base">content_copy</span>
+              Copiar
+            </button>
+          </div>
+        </div>
+
+        <div class="grid lg:grid-cols-2 gap-6">
+          <!-- Players -->
+          <div class="card">
+            <h2 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">group</span>
+              Jugadores ({{ gameStore.players.length }})
+            </h2>
+            <div class="grid grid-cols-4 sm:grid-cols-5 gap-3">
+              <div 
+                v-for="player in gameStore.players" 
+                :key="player.socketId"
+                class="text-center p-3 rounded-xl bg-gray-50"
+                :class="{ 'opacity-50': !player.connected }"
+              >
+                <div class="text-2xl mb-1">{{ player.avatar }}</div>
+                <div class="text-xs font-medium truncate">{{ player.name }}</div>
+              </div>
+              <div v-if="gameStore.players.length === 0" class="col-span-full text-center py-8 text-on-surface-variant">
+                Esperando jugadores...
+              </div>
             </div>
-            <div v-if="gameStore.players.length === 0" class="no-players">
-              Esperando jugadores...
+          </div>
+
+          <!-- Questions -->
+          <div class="card">
+            <h2 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+              <span class="material-symbols-outlined text-secondary">quiz</span>
+              Preguntas ({{ selectedQuestions.length }}/25)
+            </h2>
+            <div v-if="selectedQuestions.length > 25" class="bg-error/10 text-error p-3 rounded-lg mb-3 text-sm flex items-center gap-2">
+              <span class="material-symbols-outlined">warning</span>
+              Máximo 25 preguntas permitidas. Selecciona las mejores.
+            </div>
+            <div class="space-y-2 max-h-64 overflow-y-auto">
+              <div 
+                v-for="(q, i) in selectedQuestions" 
+                :key="q._id"
+                class="flex items-center gap-3 p-3 rounded-lg bg-gray-50 text-sm"
+              >
+                <span class="w-6 h-6 rounded-full bg-primary text-white text-xs flex items-center justify-center flex-shrink-0 font-bold">{{ i + 1 }}</span>
+                <span class="flex-1 truncate">{{ q.question }}</span>
+                <span class="text-xs text-on-surface-variant flex-shrink-0">{{ q.timeLimit }}s</span>
+              </div>
             </div>
           </div>
         </div>
 
-        <div class="questions-section">
-          <h2>Preguntas ({{ selectedQuestions.length }})</h2>
-          <div class="question-list">
+        <!-- Actions -->
+        <div class="flex justify-center gap-4">
+          <button 
+            class="btn btn-success px-8 py-4 text-base"
+            :disabled="gameStore.players.length === 0 || selectedQuestions.length === 0 || selectedQuestions.length > 25"
+            @click="startGame"
+          >
+            <span class="material-symbols-outlined">rocket_launch</span>
+            Iniciar Juego
+          </button>
+          <button class="btn btn-danger" @click="endSession">
+            <span class="material-symbols-outlined">close</span>
+            Cerrar Sala
+          </button>
+        </div>
+      </div>
+
+      <!-- PLAYING -->
+      <div v-if="gameStore.isPlaying" class="space-y-6">
+        <div class="flex justify-between items-center">
+          <div class="text-lg font-semibold text-primary">
+            Pregunta {{ gameStore.currentQuestionIndex + 1 }} / {{ gameStore.totalQuestions }}
+          </div>
+          <div 
+            class="text-2xl font-black px-4 py-2 rounded-xl"
+            :class="timerClass"
+          >
+            ⏱️ {{ gameStore.timeLeft }}s
+          </div>
+        </div>
+
+        <!-- Question -->
+        <div class="card bg-gradient-to-br from-primary/5 to-secondary/5">
+          <h2 class="text-xl font-bold text-on-surface mb-4">{{ gameStore.currentQuestion?.question }}</h2>
+          <div class="grid grid-cols-2 gap-3">
             <div 
-              v-for="(q, i) in selectedQuestions" 
-              :key="q._id"
-              class="question-item"
+              v-for="(opt, i) in gameStore.currentQuestion?.options" 
+              :key="i"
+              class="flex items-center gap-3 p-4 rounded-xl border-2"
+              :class="i === correctAnswerIndex ? 'border-green-400 bg-green-50' : 'border-gray-200 bg-white'"
             >
-              <span class="q-number">{{ i + 1 }}</span>
-              <span class="q-text">{{ q.question }}</span>
-              <span class="q-time">{{ q.timeLimit }}s</span>
+              <span class="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-sm">{{ ['A','B','C','D'][i] }}</span>
+              <span class="flex-1">{{ opt }}</span>
+              <span v-if="i === correctAnswerIndex" class="text-green-500">
+                <span class="material-symbols-outlined">check_circle</span>
+              </span>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="lobby-actions">
-        <button 
-          class="btn btn-success btn-lg"
-          :disabled="gameStore.players.length === 0 || selectedQuestions.length === 0"
-          @click="startGame"
-        >
-          🚀 Iniciar Juego
-        </button>
-        <button class="btn btn-danger" @click="endSession">
-          ✕ Cerrar Sala
-        </button>
-      </div>
-    </div>
-
-    <!-- PLAYING: Juego en curso -->
-    <div v-if="gameStore.isPlaying" class="host-game">
-      <div class="game-header">
-        <div class="question-counter">
-          Pregunta {{ gameStore.currentQuestionIndex + 1 }} / {{ gameStore.totalQuestions }}
-        </div>
-        <div class="timer-display" :class="timerClass">
-          ⏱️ {{ gameStore.timeLeft }}s
-        </div>
-      </div>
-
-      <div class="host-question">
-        <h2>{{ gameStore.currentQuestion?.question }}</h2>
-        <div class="options-preview">
-          <div 
-            v-for="(opt, i) in gameStore.currentQuestion?.options" 
-            :key="i"
-            class="option-preview"
-            :class="{ correct: i === correctAnswerIndex }"
-          >
-            <span class="opt-letter">{{ ['A','B','C','D'][i] }}</span>
-            <span class="opt-text">{{ opt }}</span>
-            <span v-if="i === correctAnswerIndex" class="opt-check">✓</span>
+        <!-- Progress -->
+        <div class="card">
+          <div class="flex justify-between text-sm mb-2">
+            <span>Progreso de respuestas</span>
+            <span>{{ answeredCount }} / {{ gameStore.players.length }}</span>
+          </div>
+          <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              class="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all duration-500"
+              :style="{ width: answerProgress + '%' }"
+            ></div>
           </div>
         </div>
-      </div>
 
-      <div class="answer-progress">
-        <div class="progress-bar">
-          <div 
-            class="progress-fill"
-            :style="{ width: answerProgress + '%' }"
-          ></div>
-        </div>
-        <span>{{ answeredCount }} / {{ gameStore.players.length }} respondieron</span>
-      </div>
-
-      <div class="live-leaderboard">
-        <h3>🏆 Leaderboard en Vivo</h3>
-        <div class="lb-list">
-          <div 
-            v-for="(player, i) in gameStore.leaderboard" 
-            :key="player.name"
-            class="lb-item"
-            :class="{ top3: i < 3 }"
-          >
-            <span class="lb-rank">{{ i + 1 }}</span>
-            <span class="lb-avatar">{{ player.avatar }}</span>
-            <span class="lb-name">{{ player.name }}</span>
-            <span class="lb-score">{{ player.score }}</span>
+        <!-- Live Leaderboard -->
+        <div class="card">
+          <h3 class="text-lg font-semibold text-primary mb-4 flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary">emoji_events</span>
+            Leaderboard en Vivo
+          </h3>
+          <div class="space-y-2">
+            <div 
+              v-for="(player, i) in gameStore.leaderboard" 
+              :key="player.name"
+              class="flex items-center gap-3 p-3 rounded-lg"
+              :class="i < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'"
+            >
+              <span class="w-8 text-center font-black" :class="i < 3 ? 'text-yellow-600' : 'text-gray-400'">{{ i + 1 }}</span>
+              <span class="text-xl">{{ player.avatar }}</span>
+              <span class="flex-1 font-medium">{{ player.name }}</span>
+              <span class="font-black text-primary">{{ player.score }}</span>
+            </div>
           </div>
         </div>
+
+        <div class="flex justify-center gap-4">
+          <button class="btn btn-primary" @click="nextQuestion">
+            <span class="material-symbols-outlined">skip_next</span>
+            Siguiente
+          </button>
+          <button class="btn btn-danger" @click="endGame">
+            <span class="material-symbols-outlined">stop</span>
+            Terminar
+          </button>
+        </div>
       </div>
 
-      <div class="host-controls">
-        <button class="btn btn-primary" @click="nextQuestion">
-          Siguiente ➜
-        </button>
-        <button class="btn btn-danger" @click="endGame">
-          Terminar Juego
+      <!-- FINISHED -->
+      <div v-if="gameStore.isFinished" class="text-center py-12">
+        <FinalLeaderboard :leaderboard="gameStore.finalResults?.leaderboard" />
+        <button class="btn btn-primary mt-8" @click="goHome">
+          <span class="material-symbols-outlined">replay</span>
+          Nueva Partida
         </button>
       </div>
-    </div>
-
-    <!-- FINISHED: Resultados finales -->
-    <div v-if="gameStore.isFinished" class="host-finished">
-      <h1>🎉 Juego Terminado</h1>
-      <FinalLeaderboard :leaderboard="gameStore.finalResults?.leaderboard" />
-      <button class="btn btn-primary" @click="goHome">
-        Nueva Partida
-      </button>
     </div>
   </div>
 </template>
@@ -154,9 +200,9 @@ const correctAnswerIndex = ref(null)
 const answeredCount = ref(0)
 
 const timerClass = computed(() => {
-  if (gameStore.timeLeft <= 5) return 'urgent'
-  if (gameStore.timeLeft <= 10) return 'warning'
-  return ''
+  if (gameStore.timeLeft <= 5) return 'bg-red-100 text-red-600 animate-pulse'
+  if (gameStore.timeLeft <= 10) return 'bg-yellow-100 text-yellow-600'
+  return 'bg-blue-100 text-blue-600'
 })
 
 const answerProgress = computed(() => {
@@ -167,7 +213,6 @@ const answerProgress = computed(() => {
 onMounted(async () => {
   socketStore.connect()
 
-  // If no session code, create one
   if (!route.params.sessionCode) {
     await createSession()
   } else {
@@ -190,13 +235,11 @@ onUnmounted(() => {
 
 async function createSession() {
   try {
-    // Fetch all questions and create session with all of them
     const res = await axios.get('/api/questions')
-    const questions = res.data
+    const questions = res.data.slice(0, 25) // Limit to 25
     selectedQuestions.value = questions
 
     const sessionRes = await axios.post('/api/sessions/create', {
-      hostId: socketStore.socket?.id || 'host-' + Date.now(),
       questionIds: questions.map(q => q._id),
       settings: {
         timePerQuestion: 20,
@@ -208,12 +251,14 @@ async function createSession() {
     gameStore.setSession(sessionRes.data.code, true)
     selectedQuestions.value = sessionRes.data.questions
 
-    // Update URL without navigation
     router.replace(`/host/${sessionRes.data.code}`)
-
     joinAsHost()
   } catch (error) {
     console.error('Error creating session:', error)
+    if (error.response?.status === 401) {
+      alert('Debes iniciar sesión para crear una partida')
+      router.push('/login')
+    }
   }
 }
 
@@ -287,372 +332,3 @@ function copyCode() {
   navigator.clipboard.writeText(gameStore.sessionCode)
 }
 </script>
-
-<style scoped>
-.host-view {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-
-/* LOBBY */
-.host-lobby {
-  background: white;
-  border-radius: 20px;
-  padding: 2rem;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-}
-
-.lobby-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.lobby-header h1 {
-  color: #667eea;
-  margin-bottom: 1rem;
-}
-
-.room-code {
-  display: inline-flex;
-  align-items: center;
-  gap: 1rem;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  padding: 1rem 2rem;
-  border-radius: 15px;
-}
-
-.code-label {
-  font-size: 0.8rem;
-  opacity: 0.8;
-}
-
-.code-value {
-  font-size: 2rem;
-  font-weight: 900;
-  letter-spacing: 0.3rem;
-}
-
-.copy-btn {
-  background: rgba(255,255,255,0.2);
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem;
-  cursor: pointer;
-  font-size: 1.2rem;
-}
-
-.lobby-content {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  margin-bottom: 2rem;
-}
-
-.players-section h2,
-.questions-section h2 {
-  color: #555;
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
-}
-
-.players-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 0.75rem;
-}
-
-.player-card {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 1rem;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.player-card.disconnected {
-  opacity: 0.5;
-}
-
-.player-avatar {
-  font-size: 2rem;
-}
-
-.player-name {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #333;
-}
-
-.player-status {
-  font-size: 0.7rem;
-  color: #f5576c;
-}
-
-.no-players {
-  grid-column: 1 / -1;
-  text-align: center;
-  color: #888;
-  padding: 2rem;
-}
-
-.question-list {
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.question-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border-radius: 10px;
-  margin-bottom: 0.5rem;
-}
-
-.q-number {
-  background: #667eea;
-  color: white;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.8rem;
-  flex-shrink: 0;
-}
-
-.q-text {
-  flex: 1;
-  font-size: 0.85rem;
-  color: #555;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.q-time {
-  font-size: 0.8rem;
-  color: #888;
-  flex-shrink: 0;
-}
-
-.lobby-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-/* PLAYING */
-.host-game {
-  background: white;
-  border-radius: 20px;
-  padding: 2rem;
-  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
-}
-
-.game-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1.5rem;
-}
-
-.question-counter {
-  font-size: 1.1rem;
-  color: #667eea;
-  font-weight: 700;
-}
-
-.timer-display {
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: #4facfe;
-  background: linear-gradient(135deg, #4facfe20, #00f2fe20);
-  padding: 0.5rem 1rem;
-  border-radius: 10px;
-}
-
-.timer-display.warning {
-  color: #f093fb;
-  background: linear-gradient(135deg, #f093fb20, #f5576c20);
-}
-
-.timer-display.urgent {
-  color: #f5576c;
-  background: linear-gradient(135deg, #f5576c20, #f093fb20);
-  animation: pulse 1s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.05); }
-}
-
-.host-question {
-  background: linear-gradient(135deg, #667eea10, #764ba210);
-  border-radius: 15px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.host-question h2 {
-  color: #333;
-  margin-bottom: 1rem;
-  font-size: 1.3rem;
-}
-
-.options-preview {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.option-preview {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: white;
-  border-radius: 12px;
-  border: 2px solid #e0e0e0;
-}
-
-.option-preview.correct {
-  border-color: #4facfe;
-  background: linear-gradient(135deg, #4facfe10, #00f2fe10);
-}
-
-.opt-letter {
-  background: #667eea;
-  color: white;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-}
-
-.opt-text {
-  flex: 1;
-  font-size: 0.95rem;
-}
-
-.opt-check {
-  color: #4facfe;
-  font-size: 1.2rem;
-  font-weight: 700;
-}
-
-.answer-progress {
-  margin-bottom: 1.5rem;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 12px;
-  background: #e0e0e0;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 0.5rem;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #667eea, #764ba2);
-  border-radius: 6px;
-  transition: width 0.5s ease;
-}
-
-.live-leaderboard {
-  background: #f8f9fa;
-  border-radius: 15px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.live-leaderboard h3 {
-  color: #667eea;
-  margin-bottom: 1rem;
-}
-
-.lb-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.lb-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background: white;
-  border-radius: 10px;
-}
-
-.lb-item.top3 {
-  background: linear-gradient(135deg, #ffd70015, #ffb70015);
-  border: 1px solid #ffd70030;
-}
-
-.lb-rank {
-  font-weight: 900;
-  color: #667eea;
-  width: 24px;
-}
-
-.lb-avatar {
-  font-size: 1.5rem;
-}
-
-.lb-name {
-  flex: 1;
-  font-weight: 600;
-}
-
-.lb-score {
-  font-weight: 900;
-  color: #667eea;
-  font-size: 1.1rem;
-}
-
-.host-controls {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-}
-
-/* FINISHED */
-.host-finished {
-  text-align: center;
-  padding: 2rem;
-}
-
-.host-finished h1 {
-  color: #667eea;
-  margin-bottom: 2rem;
-}
-
-@media (max-width: 768px) {
-  .lobby-content {
-    grid-template-columns: 1fr;
-  }
-  .options-preview {
-    grid-template-columns: 1fr;
-  }
-  .room-code {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-}
-</style>
