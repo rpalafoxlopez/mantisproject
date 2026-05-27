@@ -1,343 +1,787 @@
 <template>
-  <div class="min-h-screen bg-background py-8 px-4 lg:px-10">
-    <div class="max-w-6xl mx-auto">
-      <!-- Header -->
-      <div class="mb-8">
-        <h1 class="text-3xl font-bold text-primary flex items-center gap-3">
-          <span class="material-symbols-outlined text-secondary">settings</span>
-          Panel de Administración
-        </h1>
-        <p class="text-on-surface-variant mt-2">Gestiona las preguntas del juego. Máximo 25 preguntas por sesión.</p>
+  <div class="admin-view">
+
+    <!-- ───────────── HEADER ───────────── -->
+    <header class="admin-header">
+      <div class="header-inner">
+        <router-link to="/dashboard" class="back-link">← Dashboard</router-link>
+        <span class="logo">🦗 MANTIS</span>
+        <h1>Editor de Quiz</h1>
       </div>
+    </header>
 
-      <div class="grid lg:grid-cols-5 gap-8">
-        <!-- Form -->
-        <div class="lg:col-span-2">
-          <div class="card sticky top-24">
-            <h2 class="text-lg font-semibold text-primary mb-6 flex items-center gap-2">
-              <span class="material-symbols-outlined text-secondary">{{ editingId ? 'edit' : 'add_circle' }}</span>
-              {{ editingId ? 'Editar Pregunta' : 'Nueva Pregunta' }}
-            </h2>
+    <!-- ───────────── MAIN ───────────── -->
+    <main class="admin-main">
 
-            <form @submit.prevent="saveQuestion" class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-on-surface mb-1.5">Pregunta</label>
-                <textarea 
-                  v-model="form.question" 
-                  class="input"
-                  rows="3"
-                  placeholder="Escribe la pregunta..."
-                  required
-                ></textarea>
-              </div>
+      <!-- SIN PARTIDA ACTIVA → CREAR -->
+      <section v-if="!currentSession" class="card create-card">
+        <h2>Nueva Partida</h2>
+        <p class="subtitle">Crea una partida, escribe tus preguntas y comparte el código con los jugadores.</p>
+        <div class="field">
+          <label>Título de la partida</label>
+          <input
+            v-model="newTitle"
+            type="text"
+            placeholder="Ej. Quiz de Historia, Trivia del equipo…"
+            maxlength="100"
+            @keyup.enter="createSession"
+          />
+        </div>
+        <button class="btn-primary" :disabled="creating || !newTitle.trim()" @click="createSession">
+          <span v-if="creating">Creando…</span>
+          <span v-else>🚀 Crear Partida</span>
+        </button>
+        <p v-if="createError" class="error-msg">{{ createError }}</p>
 
-              <div>
-                <label class="block text-sm font-medium text-on-surface mb-1.5">Opciones</label>
-                <div class="space-y-2">
-                  <div v-for="(opt, i) in form.options" :key="i" class="flex gap-2">
-                    <input 
-                      v-model="form.options[i]" 
-                      class="input"
-                      :placeholder="'Opción ' + (i + 1)"
-                      required
-                    />
-                    <button 
-                      v-if="form.options.length > 2" 
-                      type="button"
-                      class="text-error hover:bg-error/10 px-2 rounded-lg transition-colors"
-                      @click="removeOption(i)"
-                    >
-                      <span class="material-symbols-outlined">delete</span>
-                    </button>
-                  </div>
-                  <button 
-                    type="button"
-                    class="text-sm text-secondary font-medium flex items-center gap-1 hover:underline"
-                    @click="addOption"
-                  >
-                    <span class="material-symbols-outlined text-base">add</span>
-                    Agregar opción
-                  </button>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-on-surface mb-1.5">Respuesta Correcta</label>
-                  <select v-model="form.correctAnswer" class="input">
-                    <option v-for="(opt, i) in form.options" :key="i" :value="i">
-                      {{ ['A','B','C','D','E'][i] }} - {{ opt || 'Opción ' + (i + 1) }}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label class="block text-sm font-medium text-on-surface mb-1.5">Dificultad</label>
-                  <select v-model="form.difficulty" class="input">
-                    <option value="easy">Fácil</option>
-                    <option value="medium">Media</option>
-                    <option value="hard">Difícil</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm font-medium text-on-surface mb-1.5">Tiempo (s)</label>
-                  <input 
-                    v-model.number="form.timeLimit" 
-                    type="number"
-                    class="input"
-                    min="5"
-                    max="120"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-on-surface mb-1.5">Puntos</label>
-                  <input 
-                    v-model.number="form.points" 
-                    type="number"
-                    class="input"
-                    min="10"
-                    max="1000"
-                  />
-                </div>
-              </div>
-
-              <div v-if="formError" class="error-text flex items-center gap-2">
-                <span class="material-symbols-outlined text-sm">error</span>
-                {{ formError }}
-              </div>
-
-              <div class="flex gap-3 pt-2">
-                <button 
-                  type="submit"
-                  class="btn btn-primary flex-1"
-                  :disabled="saving"
-                >
-                  <span v-if="saving" class="spinner"></span>
-                  <span v-else>{{ editingId ? 'Actualizar' : 'Guardar' }}</span>
-                </button>
-                <button 
-                  v-if="editingId"
-                  type="button"
-                  class="btn btn-secondary"
-                  @click="cancelEdit"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
+        <!-- listado de partidas previas en espera -->
+        <div v-if="waitingSessions.length" class="prev-sessions">
+          <h3>Partidas anteriores</h3>
+          <div
+            v-for="s in waitingSessions"
+            :key="s.code"
+            class="prev-item"
+            @click="loadSession(s.code)"
+          >
+            <span class="prev-title">{{ s.title }}</span>
+            <span class="prev-code">{{ s.code }}</span>
+            <span class="prev-count">{{ s.questions.length }} preg.</span>
           </div>
         </div>
+      </section>
 
-        <!-- List -->
-        <div class="lg:col-span-3">
-          <div class="card">
-            <div class="flex justify-between items-center mb-6">
-              <h2 class="text-lg font-semibold text-primary">
-                Preguntas ({{ questions.length }})
-              </h2>
-              <div class="text-sm text-on-surface-variant">
-                <span class="material-symbols-outlined text-base align-middle">info</span>
-                Max 25 por sesión
-              </div>
+      <!-- PARTIDA ACTIVA → GESTIONAR -->
+      <template v-else>
+
+        <!-- Código de la partida -->
+        <section class="card code-card">
+          <div class="code-top">
+            <div>
+              <h2>{{ currentSession.title }}</h2>
+              <p class="subtitle">Comparte este código con los jugadores</p>
             </div>
+            <button class="btn-ghost" @click="exitSession">← Salir</button>
+          </div>
 
-            <div v-if="loading" class="flex justify-center py-12">
-              <div class="spinner border-4 border-gray-200 border-t-primary w-8 h-8"></div>
-            </div>
+          <div class="code-display">
+            <span class="room-code">{{ currentSession.code }}</span>
+            <button class="btn-copy" @click="copyCode" :class="{ copied: codeCopied }">
+              {{ codeCopied ? '✅ Copiado' : '📋 Copiar' }}
+            </button>
+          </div>
 
-            <div v-else-if="questions.length === 0" class="text-center py-12 text-on-surface-variant">
-              <span class="material-symbols-outlined text-4xl mb-3">quiz</span>
-              <p>No hay preguntas. ¡Crea la primera!</p>
-            </div>
+          <div class="share-row">
+            <input class="share-input" readonly :value="shareUrl" />
+            <button class="btn-share" @click="shareLink">🔗 Compartir enlace</button>
+          </div>
 
-            <div v-else class="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-              <div 
-                v-for="q in questions" 
-                :key="q._id"
-                class="p-4 rounded-lg border transition-all"
-                :class="editingId === q._id ? 'border-secondary bg-secondary/5' : 'border-border-subtle hover:border-secondary/30'"
-              >
-                <div class="flex items-start justify-between gap-4">
-                  <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 mb-2">
-                      <span 
-                        class="px-2 py-0.5 rounded-full text-xs font-bold uppercase"
-                        :class="{
-                          'bg-green-100 text-green-700': q.difficulty === 'easy',
-                          'bg-yellow-100 text-yellow-700': q.difficulty === 'medium',
-                          'bg-red-100 text-red-700': q.difficulty === 'hard'
-                        }"
-                      >
-                        {{ q.difficulty }}
-                      </span>
-                      <span class="text-xs text-on-surface-variant">⏱️ {{ q.timeLimit }}s</span>
-                      <span class="text-xs text-on-surface-variant">{{ q.points }} pts</span>
-                    </div>
-                    <p class="font-medium text-on-surface text-sm mb-2">{{ q.question }}</p>
-                    <div class="flex flex-wrap gap-2">
-                      <span 
-                        v-for="(opt, i) in q.options" 
-                        :key="i"
-                        class="text-xs px-2 py-1 rounded-md"
-                        :class="i === q.correctAnswer ? 'bg-green-100 text-green-700 font-semibold' : 'bg-gray-100 text-gray-600'"
-                      >
-                        {{ ['A','B','C','D','E'][i] }}. {{ opt }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="flex gap-1 flex-shrink-0">
-                    <button 
-                      class="p-2 text-secondary hover:bg-secondary/10 rounded-lg transition-colors"
-                      @click="editQuestion(q)"
-                    >
-                      <span class="material-symbols-outlined text-lg">edit</span>
-                    </button>
-                    <button 
-                      class="p-2 text-error hover:bg-error/10 rounded-lg transition-colors"
-                      @click="deleteQuestion(q._id)"
-                    >
-                      <span class="material-symbols-outlined text-lg">delete</span>
-                    </button>
-                  </div>
+          <div class="session-meta">
+            <span class="badge badge-waiting" v-if="currentSession.status === 'waiting'">En espera</span>
+            <span>{{ currentSession.questions.length }} preguntas</span>
+            <button
+              class="btn-danger-sm"
+              @click="deleteSession"
+            >🗑 Eliminar partida</button>
+          </div>
+        </section>
+
+        <!-- LISTA DE PREGUNTAS -->
+        <section class="card questions-card">
+          <div class="questions-header">
+            <h2>Preguntas</h2>
+            <button class="btn-primary" @click="openQuestionForm(null)">+ Agregar pregunta</button>
+          </div>
+
+          <div v-if="!currentSession.questions.length" class="empty-state">
+            <p>Aún no hay preguntas. ¡Agrega la primera!</p>
+          </div>
+
+          <TransitionGroup name="qlist" tag="div" class="question-list">
+            <div
+              v-for="(q, idx) in currentSession.questions"
+              :key="idx"
+              class="question-item"
+            >
+              <div class="question-num">{{ idx + 1 }}</div>
+              <div class="question-body">
+                <p class="question-text">{{ q.text }}</p>
+                <div class="options-preview">
+                  <span
+                    v-for="(opt, oi) in q.options"
+                    :key="oi"
+                    class="opt-chip"
+                    :class="{ correct: opt.isCorrect }"
+                  >{{ opt.text }}</span>
                 </div>
+                <span class="time-label">⏱ {{ q.timeLimit }}s</span>
+              </div>
+              <div class="question-actions">
+                <button class="btn-icon" title="Editar" @click="openQuestionForm(idx)">✏️</button>
+                <button class="btn-icon btn-del" title="Eliminar" @click="deleteQuestion(idx)">🗑</button>
               </div>
             </div>
+          </TransitionGroup>
+        </section>
+
+      </template>
+    </main>
+
+    <!-- ───────────── MODAL PREGUNTA ───────────── -->
+    <Transition name="modal">
+      <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
+        <div class="modal-card">
+          <h2>{{ editIndex === null ? 'Nueva Pregunta' : 'Editar Pregunta' }}</h2>
+
+          <div class="field">
+            <label>Pregunta *</label>
+            <textarea
+              v-model="form.text"
+              placeholder="Escribe la pregunta aquí…"
+              rows="2"
+              maxlength="500"
+            />
+          </div>
+
+          <div class="field">
+            <label>Tiempo límite (segundos)</label>
+            <input v-model.number="form.timeLimit" type="number" min="5" max="120" />
+          </div>
+
+          <div class="options-section">
+            <div class="options-header-row">
+              <label>Opciones de respuesta *</label>
+              <span class="options-hint">Selecciona cuál es la correcta</span>
+            </div>
+            <p class="options-rule">⚠️ Mínimo 2, máximo 6 opciones. Exactamente 1 correcta.</p>
+
+            <div
+              v-for="(opt, i) in form.options"
+              :key="i"
+              class="option-row"
+              :class="{ 'option-correct': opt.isCorrect }"
+            >
+              <button
+                class="correct-toggle"
+                :class="{ active: opt.isCorrect }"
+                @click="setCorrect(i)"
+                type="button"
+                title="Marcar como correcta"
+              >{{ opt.isCorrect ? '✅' : '○' }}</button>
+
+              <input
+                v-model="opt.text"
+                type="text"
+                :placeholder="`Opción ${i + 1}`"
+                maxlength="200"
+                class="option-input"
+              />
+
+              <button
+                v-if="form.options.length > 2"
+                class="btn-icon btn-del"
+                @click="removeOption(i)"
+                type="button"
+              >×</button>
+            </div>
+
+            <button
+              v-if="form.options.length < 6"
+              class="btn-add-option"
+              @click="addOption"
+              type="button"
+            >+ Agregar opción</button>
+          </div>
+
+          <p v-if="formError" class="error-msg">{{ formError }}</p>
+
+          <div class="modal-actions">
+            <button class="btn-ghost" @click="closeForm">Cancelar</button>
+            <button class="btn-primary" :disabled="saving" @click="saveQuestion">
+              {{ saving ? 'Guardando…' : (editIndex === null ? 'Agregar' : 'Guardar') }}
+            </button>
           </div>
         </div>
       </div>
-    </div>
+    </Transition>
+
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API    = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const route  = useRoute()
+const router = useRouter()
 
-const questions = ref([])
-const loading = ref(false)
-const saving = ref(false)
-const editingId = ref(null)
+// ── Estado ──
+const currentSession   = ref(null)
+const waitingSessions  = ref([])
+const newTitle         = ref('')
+const creating         = ref(false)
+const createError      = ref('')
+const codeCopied       = ref(false)
+
+const showForm  = ref(false)
+const editIndex = ref(null)
+const saving    = ref(false)
 const formError = ref('')
 
-const form = reactive({
-  question: '',
-  options: ['', '', '', ''],
-  correctAnswer: 0,
-  difficulty: 'medium',
-  timeLimit: 20,
-  points: 100
-})
+const form = ref(emptyForm())
 
-onMounted(() => {
-  loadQuestions()
-})
-
-async function loadQuestions() {
-  loading.value = true
-  try {
-    const res = await axios.get(`${API_URL}/api/questions`)
-    questions.value = res.data
-  } catch (error) {
-    console.error('Error loading questions:', error)
-    if (error.response?.status === 401) {
-      formError.value = 'Sesión expirada. Por favor inicia sesión de nuevo.'
-    }
-  } finally {
-    loading.value = false
+function emptyForm() {
+  return {
+    text: '',
+    timeLimit: 20,
+    options: [
+      { text: '', isCorrect: true },
+      { text: '', isCorrect: false }
+    ]
   }
+}
+
+// ── URL de compartir ──
+const shareUrl = computed(() =>
+  currentSession.value
+    ? `${window.location.origin}/join?code=${currentSession.value.code}`
+    : ''
+)
+
+// ── Lifecycle ──
+onMounted(async () => {
+  await fetchWaitingSessions()
+
+  // 1. Prioridad: código que viene desde el Dashboard (/admin?code=XXXX)
+  const codeFromUrl = route.query.code
+  if (codeFromUrl) {
+    await loadSession(codeFromUrl.toUpperCase())
+    return
+  }
+
+  // 2. Fallback: restaurar sesión guardada en localStorage
+  const saved = localStorage.getItem('mantis_admin_code')
+  if (saved) {
+    try {
+      const { data } = await axios.get(`${API}/api/sessions/${saved}`)
+      if (data.status === 'waiting') currentSession.value = data
+    } catch {
+      localStorage.removeItem('mantis_admin_code')
+    }
+  }
+})
+
+async function fetchWaitingSessions() {
+  try {
+    const { data } = await axios.get(`${API}/api/sessions`)
+    waitingSessions.value = data.filter(s => s.status === 'waiting')
+  } catch { /* silent */ }
+}
+
+// ── Crear sesión ──
+async function createSession() {
+  if (!newTitle.value.trim()) return
+  creating.value = true
+  createError.value = ''
+  try {
+    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() })
+    currentSession.value = data
+    localStorage.setItem('mantis_admin_code', data.code)
+    newTitle.value = ''
+  } catch (e) {
+    createError.value = e.response?.data?.error || 'Error al crear la partida.'
+  } finally {
+    creating.value = false
+  }
+}
+
+async function loadSession(code) {
+  try {
+    const { data } = await axios.get(`${API}/api/sessions/${code}`)
+    currentSession.value = data
+    localStorage.setItem('mantis_admin_code', data.code)
+  } catch {
+    alert('No se pudo cargar la partida.')
+  }
+}
+
+function exitSession() {
+  currentSession.value = null
+  localStorage.removeItem('mantis_admin_code')
+  router.push('/dashboard')
+}
+
+async function deleteSession() {
+  if (!confirm('¿Eliminar esta partida y todas sus preguntas?')) return
+  try {
+    await axios.delete(`${API}/api/sessions/${currentSession.value.code}`)
+    exitSession()
+  } catch {
+    alert('Error al eliminar la partida.')
+  }
+}
+
+// ── Copiar / compartir código ──
+function copyCode() {
+  navigator.clipboard.writeText(currentSession.value.code)
+  codeCopied.value = true
+  setTimeout(() => (codeCopied.value = false), 2000)
+}
+
+function shareLink() {
+  if (navigator.share) {
+    navigator.share({ title: currentSession.value.title, url: shareUrl.value })
+  } else {
+    navigator.clipboard.writeText(shareUrl.value)
+    alert('Enlace copiado al portapapeles.')
+  }
+}
+
+// ── Formulario de pregunta ──
+function openQuestionForm(index) {
+  editIndex.value = index
+  formError.value = ''
+  if (index === null) {
+    form.value = emptyForm()
+  } else {
+    const q = currentSession.value.questions[index]
+    form.value = {
+      text: q.text,
+      timeLimit: q.timeLimit,
+      options: q.options.map(o => ({ text: o.text, isCorrect: o.isCorrect }))
+    }
+  }
+  showForm.value = true
+}
+
+function closeForm() {
+  showForm.value = false
+  formError.value = ''
 }
 
 function addOption() {
-  if (form.options.length >= 5) return
-  form.options.push('')
-}
-
-function removeOption(index) {
-  if (form.options.length <= 2) return
-  form.options.splice(index, 1)
-  if (form.correctAnswer >= form.options.length) {
-    form.correctAnswer = form.options.length - 1
+  if (form.value.options.length < 6) {
+    form.value.options.push({ text: '', isCorrect: false })
   }
 }
 
+function removeOption(i) {
+  if (form.value.options.length <= 2) return
+  // si era la correcta, marcar la primera
+  const wasCorrect = form.value.options[i].isCorrect
+  form.value.options.splice(i, 1)
+  if (wasCorrect) form.value.options[0].isCorrect = true
+}
+
+function setCorrect(i) {
+  form.value.options.forEach((o, idx) => (o.isCorrect = idx === i))
+}
+
 function validateForm() {
-  if (!form.question.trim()) return 'La pregunta es obligatoria'
-  if (form.options.some(o => !o.trim())) return 'Todas las opciones deben tener texto'
-  if (form.options.length < 2) return 'Mínimo 2 opciones'
+  if (!form.value.text.trim()) return 'El texto de la pregunta es requerido.'
+  if (form.value.options.length < 2) return 'Se requieren al menos 2 opciones.'
+  if (form.value.options.some(o => !o.text.trim())) return 'Todas las opciones deben tener texto.'
+  const correctCount = form.value.options.filter(o => o.isCorrect).length
+  if (correctCount !== 1) return 'Debe haber exactamente 1 respuesta correcta.'
   return null
 }
 
 async function saveQuestion() {
-  const error = validateForm()
-  if (error) {
-    formError.value = error
-    return
-  }
-  formError.value = ''
+  const err = validateForm()
+  if (err) { formError.value = err; return }
+
   saving.value = true
+  formError.value = ''
+  const code = currentSession.value.code
+  const payload = {
+    text: form.value.text.trim(),
+    options: form.value.options,
+    timeLimit: form.value.timeLimit
+  }
 
   try {
-    const payload = {
-      ...form,
-      options: form.options.filter(o => o.trim())
-    }
-
-    if (editingId.value) {
-      await axios.put(`${API_URL}/api/questions/${editingId.value}`, payload)
+    let res
+    if (editIndex.value === null) {
+      res = await axios.post(`${API}/api/sessions/${code}/questions`, payload)
     } else {
-      await axios.post(`${API_URL}/api/questions`, payload)
+      res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload)
     }
-
-    resetForm()
-    await loadQuestions()
-  } catch (err) {
-    formError.value = err.response?.data?.error || 'Error al guardar'
-    if (err.response?.status === 401) {
-      formError.value = 'No autorizado. Solo administradores pueden gestionar preguntas.'
-    }
+    currentSession.value = res.data
+    closeForm()
+  } catch (e) {
+    formError.value = e.response?.data?.error || 'Error al guardar la pregunta.'
   } finally {
     saving.value = false
   }
 }
 
-function editQuestion(q) {
-  editingId.value = q._id
-  form.question = q.question
-  form.options = [...q.options]
-  form.correctAnswer = q.correctAnswer
-  form.difficulty = q.difficulty
-  form.timeLimit = q.timeLimit
-  form.points = q.points
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function cancelEdit() {
-  resetForm()
-}
-
-function resetForm() {
-  editingId.value = null
-  form.question = ''
-  form.options = ['', '', '', '']
-  form.correctAnswer = 0
-  form.difficulty = 'medium'
-  form.timeLimit = 20
-  form.points = 100
-  formError.value = ''
-}
-
-async function deleteQuestion(id) {
+async function deleteQuestion(idx) {
   if (!confirm('¿Eliminar esta pregunta?')) return
   try {
-    await axios.delete(`${API_URL}/api/questions/${id}`)
-    await loadQuestions()
-  } catch (err) {
-    alert(err.response?.data?.error || 'Error al eliminar')
+    const { data } = await axios.delete(
+      `${API}/api/sessions/${currentSession.value.code}/questions/${idx}`
+    )
+    currentSession.value = data
+  } catch {
+    alert('Error al eliminar la pregunta.')
   }
 }
 </script>
+
+<style scoped>
+/* ── Base ── */
+.admin-view {
+  min-height: 100vh;
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* ── Header ── */
+.admin-header {
+  background: linear-gradient(135deg, #1b2a1b 0%, #0d1117 100%);
+  border-bottom: 1px solid #2d4a2d;
+  padding: 1rem 2rem;
+}
+.header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.logo { font-size: 1.5rem; }
+h1 { font-size: 1.2rem; font-weight: 600; color: #58c458; margin: 0; }
+.back-link {
+  color: #8b949e;
+  text-decoration: none;
+  font-size: .85rem;
+  padding: .3rem .7rem;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  transition: all .2s;
+  white-space: nowrap;
+}
+.back-link:hover { color: #e6edf3; border-color: #8b949e; }
+
+/* ── Main ── */
+.admin-main {
+  max-width: 900px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ── Card ── */
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+h2 { margin: 0 0 .4rem; font-size: 1.25rem; }
+.subtitle { color: #8b949e; font-size: .9rem; margin: 0 0 1.2rem; }
+
+/* ── Create card ── */
+.create-card { max-width: 540px; margin: 0 auto; width: 100%; }
+
+/* ── Code card ── */
+.code-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.code-display {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: #0d1117;
+  border: 2px solid #58c458;
+  border-radius: 10px;
+  padding: .8rem 1.2rem;
+  margin-bottom: 1rem;
+}
+.room-code {
+  font-size: 2.8rem;
+  font-weight: 800;
+  letter-spacing: .4rem;
+  color: #58c458;
+  font-family: 'Courier New', monospace;
+  flex: 1;
+}
+.share-row {
+  display: flex;
+  gap: .5rem;
+  margin-bottom: 1rem;
+}
+.share-input {
+  flex: 1;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #8b949e;
+  padding: .4rem .8rem;
+  font-size: .85rem;
+}
+.session-meta {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: .9rem;
+  color: #8b949e;
+}
+
+/* ── Questions card ── */
+.questions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #8b949e;
+  border: 2px dashed #30363d;
+  border-radius: 8px;
+}
+.question-list { display: flex; flex-direction: column; gap: .75rem; }
+.question-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: .9rem 1rem;
+  transition: border-color .2s;
+}
+.question-item:hover { border-color: #58c458; }
+.question-num {
+  min-width: 28px;
+  height: 28px;
+  background: #2d4a2d;
+  color: #58c458;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: .8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.question-body { flex: 1; }
+.question-text { margin: 0 0 .5rem; font-size: .95rem; }
+.options-preview { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+.opt-chip {
+  font-size: .75rem;
+  padding: .15rem .55rem;
+  border-radius: 20px;
+  background: #21262d;
+  color: #8b949e;
+  border: 1px solid #30363d;
+}
+.opt-chip.correct {
+  background: #1a3a1a;
+  color: #58c458;
+  border-color: #58c458;
+  font-weight: 600;
+}
+.time-label { font-size: .75rem; color: #8b949e; }
+.question-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+
+/* ── Buttons ── */
+.field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
+.field label { font-size: .85rem; color: #8b949e; font-weight: 500; }
+input[type="text"], input[type="number"], textarea {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e6edf3;
+  padding: .6rem .8rem;
+  font-size: .95rem;
+  outline: none;
+  transition: border-color .2s;
+  font-family: inherit;
+  resize: vertical;
+}
+input:focus, textarea:focus { border-color: #58c458; }
+input[type="number"] { width: 80px; }
+
+.btn-primary {
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: .6rem 1.2rem;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s, opacity .2s;
+}
+.btn-primary:hover:not(:disabled) { background: #2ea043; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-ghost {
+  background: transparent;
+  color: #8b949e;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: .5rem 1rem;
+  cursor: pointer;
+  font-size: .9rem;
+  transition: color .2s, border-color .2s;
+}
+.btn-ghost:hover { color: #e6edf3; border-color: #8b949e; }
+.btn-copy {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  border-radius: 6px;
+  padding: .4rem .9rem;
+  cursor: pointer;
+  font-size: .85rem;
+  transition: background .2s;
+}
+.btn-copy.copied { background: #1a3a1a; color: #58c458; border-color: #58c458; }
+.btn-share {
+  background: #1f6feb;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: .4rem .9rem;
+  cursor: pointer;
+  font-size: .85rem;
+  white-space: nowrap;
+}
+.btn-icon {
+  background: transparent;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: .3rem .5rem;
+  cursor: pointer;
+  font-size: .9rem;
+  color: #8b949e;
+  transition: all .2s;
+}
+.btn-icon:hover { border-color: #8b949e; color: #e6edf3; }
+.btn-icon.btn-del:hover { border-color: #f85149; color: #f85149; }
+.btn-danger-sm {
+  background: transparent;
+  border: 1px solid #f8514930;
+  color: #f85149;
+  border-radius: 6px;
+  padding: .3rem .7rem;
+  font-size: .8rem;
+  cursor: pointer;
+  margin-left: auto;
+  transition: background .2s;
+}
+.btn-danger-sm:hover { background: #f8514915; }
+.btn-add-option {
+  background: transparent;
+  border: 1px dashed #30363d;
+  color: #8b949e;
+  border-radius: 6px;
+  padding: .4rem 1rem;
+  width: 100%;
+  cursor: pointer;
+  font-size: .85rem;
+  margin-top: .4rem;
+  transition: all .2s;
+}
+.btn-add-option:hover { border-color: #58c458; color: #58c458; }
+
+/* ── Badge ── */
+.badge { font-size: .75rem; padding: .2rem .6rem; border-radius: 20px; font-weight: 600; }
+.badge-waiting { background: #2d3f2d; color: #58c458; }
+
+/* ── Error ── */
+.error-msg { color: #f85149; font-size: .85rem; margin-top: .4rem; }
+
+/* ── Prev sessions ── */
+.prev-sessions { margin-top: 1.5rem; border-top: 1px solid #30363d; padding-top: 1rem; }
+.prev-sessions h3 { font-size: .9rem; color: #8b949e; margin-bottom: .7rem; }
+.prev-item {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  padding: .5rem .75rem;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: border-color .2s;
+  margin-bottom: .4rem;
+}
+.prev-item:hover { border-color: #58c458; }
+.prev-title { flex: 1; font-size: .9rem; }
+.prev-code { font-family: monospace; font-size: .85rem; color: #58c458; font-weight: 700; }
+.prev-count { font-size: .8rem; color: #8b949e; }
+
+/* ── Modal ── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+.modal-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-card h2 { margin: 0 0 1.2rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.2rem; }
+
+/* ── Options ── */
+.options-section { margin-bottom: 1rem; }
+.options-header-row {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: .3rem;
+}
+.options-hint { font-size: .8rem; color: #8b949e; }
+.options-rule { font-size: .8rem; color: #e3b341; margin-bottom: .7rem; }
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin-bottom: .4rem;
+  padding: .4rem .6rem;
+  border-radius: 6px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  transition: border-color .2s;
+}
+.option-row.option-correct { border-color: #58c458; background: #1a2a1a; }
+.correct-toggle {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  min-width: 1.5rem;
+}
+.option-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: #e6edf3;
+  font-size: .9rem;
+  outline: none;
+  padding: .1rem 0;
+}
+
+/* ── Transitions ── */
+.modal-enter-active, .modal-leave-active { transition: opacity .2s, transform .2s; }
+.modal-enter-from, .modal-leave-to { opacity: 0; transform: scale(.96); }
+.qlist-enter-active, .qlist-leave-active { transition: all .25s; }
+.qlist-enter-from { opacity: 0; transform: translateY(-8px); }
+.qlist-leave-to { opacity: 0; transform: translateX(10px); }
+</style>

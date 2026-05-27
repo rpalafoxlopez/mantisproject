@@ -1,81 +1,75 @@
+// apps/frontend/src/router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
-import { useAuthStore } from '../stores/auth.js'
+
+import HomeView       from '../views/HomeView.vue'
+import DashboardView  from '../views/DashboardView.vue'
+import AdminView      from '../views/AdminView.vue'
+import HostView       from '../views/HostView.vue'
+import JoinView       from '../views/JoinView.vue'
+import PlayView       from '../views/PlayView.vue'
+import ResultsView    from '../views/ResultsView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: () => import('@/views/HomeView.vue')
+    name: 'home',
+    component: HomeView
   },
   {
-    path: '/login',
-    name: 'Login',
-    component: () => import('@/views/LoginView.vue'),
-    meta: { guestOnly: true }
+    // Dashboard: vista principal del admin, muestra todos los quizzes
+    path: '/dashboard',
+    name: 'dashboard',
+    component: DashboardView,
+    meta: { title: 'Dashboard — MANTIS' }
   },
   {
-    path: '/register',
-    name: 'Register',
-    component: () => import('@/views/RegisterView.vue'),
-    meta: { guestOnly: true }
-  },
-  {
+    // Editor de quiz: se accede con ?code=XXXXXX
+    // Si no hay code, AdminView crea uno nuevo al aterrizar
     path: '/admin',
-    name: 'Admin',
-    component: () => import('@/views/AdminView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
+    name: 'admin',
+    component: AdminView,
+    meta: { title: 'Editor de Quiz — MANTIS' }
   },
   {
-    path: '/host/:sessionCode?',
-    name: 'Host',
-    component: () => import('@/views/HostView.vue'),
-    props: true,
-    meta: { requiresAuth: true }
+    path: '/host',
+    name: 'host',
+    component: HostView,
+    meta: { title: 'Host — MANTIS' }
   },
   {
     path: '/join',
-    name: 'Join',
-    component: () => import('@/views/JoinView.vue')
+    name: 'join',
+    component: JoinView,
+    meta: { title: 'Unirse — MANTIS' }
   },
   {
-    path: '/play/:sessionCode',
-    name: 'Play',
-    component: () => import('@/views/PlayView.vue'),
-    props: true
+    path: '/play',
+    name: 'play',
+    component: PlayView,
+    meta: { title: 'Jugar — MANTIS' }
   },
   {
-    path: '/results/:sessionCode',
-    name: 'Results',
-    component: () => import('@/views/ResultsView.vue'),
-    props: true
+    path: '/results',
+    name: 'results',
+    component: ResultsView,
+    meta: { title: 'Resultados — MANTIS' }
+  },
+  // Redirigir rutas desconocidas al home
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
-  routes
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes,
+  scrollBehavior: () => ({ top: 0 })
 })
 
-// Navigation guards
-router.beforeEach((to, from, next) => {
-  const authStore = useAuthStore()
-
-  // Redirect authenticated users away from login/register
-  if (to.meta.guestOnly && authStore.isAuthenticated) {
-    return next('/')
-  }
-
-  // Require auth
-  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return next('/login')
-  }
-
-  // Require admin
-  if (to.meta.requiresAdmin && !authStore.isAdmin) {
-    return next('/')
-  }
-
-  next()
+// Actualizar <title> de la página
+router.afterEach((to) => {
+  document.title = to.meta.title || 'MANTIS'
 })
 
 export default router

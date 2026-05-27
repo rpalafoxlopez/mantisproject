@@ -1,21 +1,25 @@
-// Generate a random 4-character room code (e.g., PENS-4821)
-export function generateRoomCode() {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars
+/**
+ * Genera un código alfanumérico de 6 caracteres para la sala.
+ * Excluye caracteres confusos (0, O, I, 1) para facilitar lectura.
+ */
+export function generateRoomCode(length = 6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 4; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < length; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
   }
   return code;
 }
 
-// Calculate score based on time taken and correctness
-export function calculateScore(timeLimit, timeTaken, basePoints, isCorrect) {
-  if (!isCorrect) return 0;
-
-  // Faster = more points. Max bonus for answering in first 50% of time
-  const timeRatio = timeTaken / (timeLimit * 1000); // timeTaken in ms
-  const speedBonus = Math.max(0, 1 - timeRatio);
-  const bonusMultiplier = 1 + (speedBonus * 0.5); // up to 50% bonus
-
-  return Math.round(basePoints * bonusMultiplier);
+/**
+ * Calcula puntos basado en tiempo de respuesta.
+ * @param {number} timeLimit - Tiempo total de la pregunta en segundos
+ * @param {number} timeUsed  - Tiempo usado en segundos
+ * @returns {number} Puntos obtenidos
+ */
+export function calculateScore(timeLimit, timeUsed) {
+  const ratio = timeUsed / timeLimit;
+  if (ratio < 0.5) return 150;
+  if (ratio < 0.8) return 100;
+  return Math.max(50, Math.round(100 - (ratio - 0.5) * 100));
 }

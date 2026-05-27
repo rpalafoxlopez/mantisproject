@@ -1,98 +1,149 @@
 import express from 'express';
 import Session from '../models/Session.js';
-import Question from '../models/Question.js';
 import { generateRoomCode } from '../utils/helpers.js';
-import { authenticate } from '../middleware/auth.js';
 
 const router = express.Router();
 
-const MAX_QUESTIONS_PER_SESSION = 25;
-
-// Create new session (requires auth)
-router.post('/create', authenticate, async (req, res) => {
+// POST /api/sessions/create — Crear partida nueva
+router.post('/create', async (req, res) => {
   try {
-    const { questionIds, settings } = req.body;
-    const hostId = req.user._id.toString();
-
-    if (!questionIds || questionIds.length === 0) {
-      return res.status(400).json({ error: 'At least one question is required' });
+    const { title } = req.body;
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: 'El título de la partida es requerido.' });
     }
 
-    if (questionIds.length > MAX_QUESTIONS_PER_SESSION) {
-      return res.status(400).json({ 
-        error: `Maximum ${MAX_QUESTIONS_PER_SESSION} questions per session. You selected ${questionIds.length}.` 
-      });
-    }
+    let code;
+    let attempts = 0;
+    do {
+      code = generateRoomCode();
+      attempts++;
+      if (attempts > 20) return res.status(500).json({ error: 'No se pudo generar un código único.' });
+    } while (await Session.findOne({ code }));
 
-    // Validate questions exist
-    const questions = await Question.find({ _id: { $in: questionIds } });
-    if (questions.length === 0) {
-      return res.status(400).json({ error: 'No valid questions found' });
-    }
-
-    if (questions.length !== questionIds.length) {
-      return res.status(400).json({ error: 'Some question IDs are invalid' });
-    }
-
-    const code = generateRoomCode();
-
-    const session = new Session({
-      code,
-      hostId,
-      questions: questions.map(q => q._id),
-      settings: settings || {}
-    });
-
+    const session = new Session({ title: title.trim(), code, questions: [] });
     await session.save();
-    await session.populate('questions');
-
     res.status(201).json(session);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Get session by code (public)
-router.get('/:code', async (req, res) => {
-  try {
-    const session = await Session.findOne({ code: req.params.code.toUpperCase() })
-      .populate('questions');
-
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-
-    res.json(session);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get all active sessions (public)
+// GET /api/sessions — Listar sesiones activas (waiting, active, finished)
 router.get('/', async (req, res) => {
   try {
-    const sessions = await Session.find({ status: { $in: ['waiting', 'playing'] } })
-      .populate('questions', 'question category')
+    const sessions = await Session.find()
+      .select('code title status questions createdAt')
       .sort({ createdAt: -1 });
     res.json(sessions);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Delete session (requires auth, only host or admin)
-router.delete('/:code', authenticate, async (req, res) => {
+// GET /api/sessions/:code — Obtener sesión por código
+router.get('/:code', async (req, res) => {
   try {
     const session = await Session.findOne({ code: req.params.code.toUpperCase() });
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada.' });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    // Only host or admin can delete
-    if (session.hostId !== req.user._id.toString() && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the host or admin can delete this session' });
+// PUT /api/sessions/:code/title — Actualizar título
+router.put('/:code/title', async (req, res) => {
+  try {
+    const { title } = req.body;
+    if (!title || !title.trim()) return res.status(400).json({ error: 'Título requerido.' });
+
+    const session = await Session.findOneAndUpdate(
+      { code: req.params.code.toUpperCase(), status: 'waiting' },
+      { title: title.trim() },
+      { new: true }
+    );
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada o ya iniciada.' });
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/sessions/:code/questions — Agregar pregunta
+router.post('/:code/questions', async (req, res) => {
+  try {
+    const { text, options, timeLimit } = req.body;
+
+    if (!text || !text.trim()) return res.status(400).json({ error: 'El texto de la pregunta es requerido.' });
+    if (!options || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: 'Se requieren al menos 2 opciones.' });
+    }
+    const correctCount = options.filter(o => o.isCorrect).length;
+    if (correctCount !== 1) {
+      return res.status(400).json({ error: 'Debe haber exactamente 1 respuesta correcta.' });
     }
 
-    await Session.findOneAndDelete({ code: req.params.code.toUpperCase() });
-    res.json({ message: 'Session deleted' });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+    const session = await Session.findOne({ code: req.params.code.toUpperCase(), status: 'waiting' });
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada o ya iniciada.' });
+
+    session.questions.push({ text: text.trim(), options, timeLimit: timeLimit || 20 });
+    await session.save();
+    res.status(201).json(session);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// PUT /api/sessions/:code/questions/:index — Editar pregunta
+router.put('/:code/questions/:index', async (req, res) => {
+  try {
+    const { text, options, timeLimit } = req.body;
+    const idx = parseInt(req.params.index);
+
+    const session = await Session.findOne({ code: req.params.code.toUpperCase(), status: 'waiting' });
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada o ya iniciada.' });
+    if (idx < 0 || idx >= session.questions.length) return res.status(400).json({ error: 'Índice inválido.' });
+
+    if (!options || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: 'Se requieren al menos 2 opciones.' });
+    }
+    const correctCount = options.filter(o => o.isCorrect).length;
+    if (correctCount !== 1) {
+      return res.status(400).json({ error: 'Debe haber exactamente 1 respuesta correcta.' });
+    }
+
+    session.questions[idx] = { text: text.trim(), options, timeLimit: timeLimit || 20 };
+    await session.save();
+    res.json(session);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// DELETE /api/sessions/:code/questions/:index — Eliminar pregunta
+router.delete('/:code/questions/:index', async (req, res) => {
+  try {
+    const idx = parseInt(req.params.index);
+    const session = await Session.findOne({ code: req.params.code.toUpperCase(), status: 'waiting' });
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada.' });
+    if (idx < 0 || idx >= session.questions.length) return res.status(400).json({ error: 'Índice inválido.' });
+
+    session.questions.splice(idx, 1);
+    await session.save();
+    res.json(session);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/sessions/:code — Eliminar sesión entera
+router.delete('/:code', async (req, res) => {
+  try {
+    const session = await Session.findOneAndDelete({ code: req.params.code.toUpperCase() });
+    if (!session) return res.status(404).json({ error: 'Sesión no encontrada.' });
+    res.json({ message: 'Sesión eliminada.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
