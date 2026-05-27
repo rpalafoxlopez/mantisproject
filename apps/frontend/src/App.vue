@@ -3,20 +3,19 @@
     <!-- Top Navigation -->
     <header 
       v-if="showNav" 
-      class="w-full sticky top-0 bg-surface-white border-b border-border-subtle shadow-sm z-50"
+      class="sticky top-0 z-50 w-full border-b shadow-sm bg-surface-white border-border-subtle"
     >
-      <div class="flex justify-between items-center h-20 px-6 lg:px-10 max-w-7xl mx-auto">
+      <div class="flex items-center justify-between h-20 px-6 mx-auto lg:px-10 max-w-7xl">
         <!-- Logo -->
-        <router-link to="/" class="flex items-center gap-2 text-primary font-bold text-xl">
-          <span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">hive</span>
-          QuizHive
+        <router-link to="/" class="flex items-center gap-2 text-xl font-bold text-primary">
+          <img src="/img/quizhive.png" width="120" alt="QuizHive Logo" />
         </router-link>
 
         <!-- Nav Links -->
-        <nav class="hidden md:flex gap-8">
+        <nav class="hidden gap-8 md:flex">
           <router-link 
             to="/" 
-            class="text-label-md font-label-md transition-colors"
+            class="transition-colors text-label-md font-label-md"
             :class="$route.path === '/' ? 'text-secondary font-bold border-b-2 border-secondary pb-1' : 'text-on-surface-variant hover:text-secondary'"
           >
             Home
@@ -24,7 +23,7 @@
           <router-link 
             v-if="authStore.isAdmin"
             to="/admin" 
-            class="text-label-md font-label-md transition-colors"
+            class="transition-colors text-label-md font-label-md"
             :class="$route.path === '/admin' ? 'text-secondary font-bold border-b-2 border-secondary pb-1' : 'text-on-surface-variant hover:text-secondary'"
           >
             Admin
@@ -35,12 +34,12 @@
         <div class="flex items-center gap-4">
           <template v-if="authStore.isAuthenticated">
             <div class="flex items-center gap-3">
-              <span class="text-body-sm font-body-sm text-on-surface-variant hidden sm:block">
+              <span class="hidden text-body-sm font-body-sm text-on-surface-variant sm:block">
                 {{ authStore.user?.name }}
               </span>
               <button 
                 @click="authStore.logout"
-                class="text-on-surface-variant hover:text-error transition-colors text-label-md font-label-md"
+                class="transition-colors text-on-surface-variant hover:text-error text-label-md font-label-md"
               >
                 Logout
               </button>
@@ -49,7 +48,7 @@
           <template v-else>
             <router-link 
               to="/login" 
-              class="text-on-surface-variant hover:text-secondary px-4 py-2 text-label-md font-label-md transition-colors"
+              class="px-4 py-2 transition-colors text-on-surface-variant hover:text-secondary text-label-md font-label-md"
             >
               Login
             </router-link>
