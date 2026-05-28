@@ -2,8 +2,7 @@
   <div class="host-container">
     <header class="host-header">
       <div class="logo-section">
-        <img src="/img/logo.png" alt="MANTIS" class="host-logo" />
-        <span class="logo-text">MANTIS</span>
+        <img src="./img/logo.png" alt="MANTIS" class="host-logo" />
       </div>
       <div class="header-actions">
         <button class="btn-exit" @click="exitGame">
