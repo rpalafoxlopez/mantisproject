@@ -115,7 +115,7 @@ export function setupGameSocket(io) {
         socket.data.code = cleanCode;
         socket.data.name = cleanName;
 
-        // Enviar todas las preguntas al jugador
+        // Enviar TODAS las preguntas al jugador
         socket.emit('player:joined', {
           name: cleanName,
           code: cleanCode,
@@ -130,7 +130,11 @@ export function setupGameSocket(io) {
 
         // Notificar a host del cambio
         io.to(cleanCode).emit('players:update', {
-          players: session.players.map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+          players: session.players.map(p => ({
+            name: p.name,
+            score: p.score,
+            totalAnswered: p.answers.length
+          }))
         });
 
       } catch (err) {
@@ -183,7 +187,11 @@ export function setupGameSocket(io) {
         // Actualizar progreso en host
         io.to(cleanCode).emit('players:update', {
           players: session.players
-            .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+            .map(p => ({
+              name: p.name,
+              score: p.score,
+              totalAnswered: p.answers.length
+            }))
             .sort((a, b) => b.score - a.score)
         });
 
@@ -249,7 +257,11 @@ export function setupGameSocket(io) {
 
           const updated = await Session.findOne({ code: socket.data.code });
           io.to(socket.data.code).emit('players:update', {
-            players: updated?.players.map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length })) || []
+            players: updated?.players.map(p => ({
+              name: p.name,
+              score: p.score,
+              totalAnswered: p.answers.length
+            })) || []
           });
 
           console.log(`🗑️ Eliminado tras grace period: ${socket.data.name || socket.id}`);

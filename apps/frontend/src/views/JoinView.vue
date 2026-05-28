@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="join-view">
     <header class="join-header">
       <router-link to="/" class="back-link">← Inicio</router-link>
@@ -64,7 +64,7 @@ function focusName() { nameInput.value?.focus() }
 
 function joinQuiz() {
   if (!code.value.trim() || !name.value.trim() || joining.value) return
-  
+
   joining.value = true
   error.value = ''
 
@@ -73,7 +73,8 @@ function joinQuiz() {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000
+      reconnectionDelay: 1000,
+      timeout: 10000
     })
   }
 
@@ -81,35 +82,27 @@ function joinQuiz() {
   socket.off('error')
   socket.off('connect_error')
 
-  socket.once('player:joined', ({ code: c, title, questions, totalQuestions }) => {
+  socket.once('player:joined', ({ code: c, title }) => {
     console.log('✅ Unido al quiz:', title)
-    
     localStorage.setItem('quizhive_player_code', c)
     localStorage.setItem('quizhive_player_name', name.value.trim())
-    
-    // Redirigir a /play con todas las preguntas
-    router.push({
-      path: '/play',
-      query: {
-        code: c,
-        name: encodeURIComponent(name.value.trim())
-      }
-    })
+    router.push(`/play?code=${c}&name=${encodeURIComponent(name.value.trim())}`)
   })
 
   socket.once('error', ({ message }) => {
+    console.log('❌ Error:', message)
     error.value = message
     joining.value = false
   })
 
   socket.once('connect_error', () => {
-    error.value = 'Error de conexión. Intenta de nuevo.'
+    error.value = 'No se pudo conectar al servidor.'
     joining.value = false
   })
 
   setTimeout(() => {
     if (joining.value) {
-      error.value = 'El servidor no respondió.'
+      error.value = 'El servidor no respondió. Intenta de nuevo.'
       joining.value = false
     }
   }, 8000)

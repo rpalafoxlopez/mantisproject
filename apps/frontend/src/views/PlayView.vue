@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="play-view">
     <header class="play-header">
       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
@@ -146,7 +146,7 @@ const questions = ref([])
 const totalQuestions = ref(0)
 const currentQuestion = ref(0)
 const selectedOption = ref(null)
-const answers = ref({}) // { questionIndex: { answerIndex, isCorrect, points } }
+const answers = ref({})
 const showAnswerFeedback = ref(false)
 const lastAnswerCorrect = ref(false)
 const lastPoints = ref(0)
@@ -178,7 +178,6 @@ onMounted(() => {
 
   socket.on('connect', () => {
     console.log('✅ Socket conectado:', socket.id)
-    // Re-unirse automáticamente al reconectar
     socket.emit('player:join', {
       code: code.value,
       name: playerName.value
@@ -186,12 +185,18 @@ onMounted(() => {
   })
 
   socket.on('player:joined', ({ title: t, questions: q, totalQuestions: total }) => {
-    console.log('✅ Unido al quiz:', t)
+    console.log('✅ Unido al quiz:', t, 'Preguntas:', q?.length)
     title.value = t
-    questions.value = q
-    totalQuestions.value = total
-    questionStartTime = Date.now()
+    questions.value = q || []
+    totalQuestions.value = total || (q ? q.length : 0)
+    currentQuestion.value = 0
+    selectedOption.value = null
+    answers.value = {}
+    showAnswerFeedback.value = false
     showResults.value = false
+    myScore.value = 0
+    correctCount.value = 0
+    questionStartTime = Date.now()
   })
 
   socket.on('answer:confirmed', ({ questionIndex, isCorrect, points, yourScore, correctIndex: ci }) => {
@@ -230,7 +235,6 @@ onMounted(() => {
     }
   })
 
-  // Unirse inicialmente
   socket.emit('player:join', {
     code: code.value,
     name: playerName.value
@@ -268,7 +272,6 @@ function goToQuestion(idx) {
     correctIndex.value = -1
     questionStartTime = Date.now()
 
-    // Restaurar selección previa si ya respondió
     const prev = answers.value[idx]
     if (prev) {
       selectedOption.value = prev.answerIndex
@@ -286,7 +289,6 @@ function goToNextUnanswered() {
       return
     }
   }
-  // Todas respondidas
   if (answeredCount.value === totalQuestions.value) {
     finishQuiz()
   }

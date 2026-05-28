@@ -1,122 +1,177 @@
 <template>
-  <div class="host-view">
+  <div class="host-container">
     <header class="host-header">
-      <router-link to="/dashboard" class="back-link">← Dashboard</router-link>
-      <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
+      <div class="logo-section">
+        <img src="/img/logo.png" alt="MANTIS" class="host-logo" />
+        <span class="logo-text">MANTIS</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn-exit" @click="exitGame">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
     </header>
 
-    <main class="host-main">
-      <!-- JOIN FORM -->
-      <section v-if="!joined" class="card join-card">
-        <h2>🎮 Panel del Host</h2>
-        <p class="subtitle">Ingresa el código de la partida que quieres iniciar.</p>
-        <div class="field">
-          <label>Código de la partida</label>
-          <input v-model="joinCode" type="text" placeholder="Ej. ABC123" maxlength="6" @keyup.enter="joinAsHost" />
-        </div>
-        <button class="btn-primary" :disabled="joining || !joinCode.trim()" @click="joinAsHost">
-          <span v-if="joining">Entrando…</span><span v-else>▶️ Entrar como Host</span>
-        </button>
-        <p v-if="joinError" class="error-msg">{{ joinError }}</p>
-      </section>
-
-      <!-- LOBBY -->
-      <template v-else-if="status === 'waiting'">
-        <section class="card lobby-card">
-          <div class="lobby-top">
-            <div>
-              <h2>{{ title }}</h2>
-              <p class="subtitle">Esperando jugadores…</p>
+    <!-- LOBBY / DASHBOARD DEL HOST -->
+    <div v-if="!showFinalResults" class="lobby-view">
+      <div class="lobby-card">
+        <div class="session-info">
+          <h1 class="session-title">{{ sessionTitle || 'Sala de Control' }}</h1>
+          <div class="code-section">
+            <label>Código de Sala</label>
+            <div class="code-display" @click="copyCode">
+              <span class="code-text">{{ sessionCode }}</span>
+              <button class="btn-copy" :class="{ 'copied': copied }">
+                <span class="material-icons">{{ copied ? 'check' : 'content_copy' }}</span>
+              </button>
             </div>
-            <div class="code-badge">{{ code }}</div>
+            <span v-if="copied" class="copy-feedback">¡Copiado!</span>
           </div>
-
-          <div class="players-area">
-            <h3>Jugadores conectados ({{ players.length }})</h3>
-            <div v-if="!players.length" class="empty-players">
-              <p>Aún no hay jugadores. Comparte el código para que se unan.</p>
-            </div>
-            <div v-else class="player-list">
-              <div v-for="p in players" :key="p.socketId" class="player-chip">
-                <span class="player-avatar">{{ p.name.charAt(0).toUpperCase() }}</span>
-                <span class="player-name">{{ p.name }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="lobby-actions">
-            <button class="btn-primary btn-large" :disabled="!players.length || !questionCount" @click="startGame">
-              ▶️ Iniciar partida
+          <div class="share-bar">
+            <span class="share-label">Compartir:</span>
+            <button class="btn-share-icon btn-whatsapp" @click="shareWhatsApp" title="WhatsApp">
+              <img src="/img/whatsapp-icon.svg" alt="WA" />
             </button>
-            <p v-if="!questionCount" class="warn-msg">⚠️ La partida no tiene preguntas. Ve al editor para agregarlas.</p>
+            <button class="btn-share-icon btn-telegram" @click="shareTelegram" title="Telegram">
+              <img src="/img/telegram-icon.svg" alt="TG" />
+            </button>
+            <button class="btn-share-icon" @click="copyLink" title="Copiar link">
+              <span class="material-icons">link</span>
+            </button>
           </div>
-        </section>
-      </template>
+          <div class="join-url"><code>{{ joinUrl }}</code></div>
+        </div>
 
-      <!-- GAME ACTIVE -->
-      <template v-else-if="status === 'active'">
-        <section class="card game-card">
-          <div class="game-header">
-            <span class="q-counter">Pregunta {{ currentQuestion + 1 }} / {{ totalQuestions }}</span>
-            <div class="timer-bar">
-              <div class="timer-fill" :style="{ width: timerPercent + '%' }"></div>
+        <!-- ESTADÍSTICAS EN VIVO -->
+        <div class="live-stats-host">
+          <div class="stat-card">
+            <span class="stat-value">{{ players.length }}</span>
+            <span class="stat-label">Jugadores</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">{{ totalAnswered }}</span>
+            <span class="stat-label">Respuestas totales</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value">{{ avgProgress }}%</span>
+            <span class="stat-label">Progreso promedio</span>
+          </div>
+        </div>
+
+        <!-- LISTA DE JUGADORES CON PROGRESO -->
+        <div class="players-section">
+          <div class="players-header">
+            <h2><span class="material-icons">group</span> Jugadores ({{ players.length }})</h2>
+          </div>
+          <div class="players-table">
+            <div class="table-header">
+              <span>#</span>
+              <span>Nombre</span>
+              <span>Progreso</span>
+              <span>Puntaje</span>
+            </div>
+            <div
+              v-for="(player, i) in sortedPlayers"
+              :key="player.name"
+              class="player-row"
+              :class="{ 'top3': i < 3 }"
+            >
+              <span class="row-rank">{{ i + 1 }}</span>
+              <span class="row-name">{{ player.name }}</span>
+              <span class="row-progress">
+                <div class="progress-bar-mini">
+                  <div class="progress-fill-mini" :style="{ width: (player.totalAnswered / questionCount * 100) + '%' }"></div>
+                </div>
+                <span class="progress-text">{{ player.totalAnswered }}/{{ questionCount }}</span>
+              </span>
+              <span class="row-score">{{ player.score }}</span>
             </div>
           </div>
+        </div>
 
-          <div class="question-area">
-            <h2 class="q-text">{{ questionText }}</h2>
-            <div class="options-grid">
-              <div v-for="(opt, i) in questionOptions" :key="i" class="option-box" :class="{ correct: showResults && i === correctIndex, wrong: showResults && selectedAnswers[i] && i !== correctIndex }">
-                <span class="opt-letter">{{ ['A','B','C','D','E','F'][i] }}</span>
-                <span class="opt-text">{{ opt.text }}</span>
-                <span v-if="showResults && i === correctIndex" class="opt-check">✅</span>
-              </div>
+        <!-- PREGUNTAS DEL QUIZ -->
+        <div v-if="questions.length" class="questions-section">
+          <h2><span class="material-icons">quiz</span> Preguntas ({{ questions.length }})</h2>
+          <div class="questions-list">
+            <div v-for="(q, i) in questions" :key="i" class="question-item">
+              <span class="q-num">{{ i + 1 }}</span>
+              <span class="q-text">{{ q.text }}</span>
+              <span class="q-meta">{{ q.options.length }} opciones</span>
             </div>
           </div>
+        </div>
 
-          <div class="game-actions">
-            <button v-if="!showResults" class="btn-ghost" @click="endGame">⏹ Terminar</button>
-            <button v-if="showResults && !isLastQuestion" class="btn-primary" @click="nextQuestion">Siguiente →</button>
-            <button v-if="showResults && isLastQuestion" class="btn-primary" @click="endGame">🏁 Ver resultados</button>
+        <!-- CONTROLES -->
+        <div class="controls-section">
+          <button class="btn-end-quiz" @click="endQuiz">
+            <span class="material-icons">stop</span>
+            Cerrar Quiz y Ver Resultados
+          </button>
+          <p class="hint">Los jugadores podrán seguir respondiendo hasta que cierres el quiz.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULTADOS FINALES -->
+    <div v-else class="final-results-view">
+      <div class="results-card">
+        <h1><span class="material-icons">emoji_events</span> Resultados Finales</h1>
+        <h2>{{ sessionTitle }}</h2>
+
+        <div class="final-stats">
+          <div class="stat-box">
+            <span class="stat-num">{{ finalResults.totalPlayers }}</span>
+            <span class="stat-desc">Jugadores</span>
           </div>
+          <div class="stat-box">
+            <span class="stat-num">{{ finalResults.totalQuestions }}</span>
+            <span class="stat-desc">Preguntas</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-num">{{ totalResponses }}</span>
+            <span class="stat-desc">Respuestas totales</span>
+          </div>
+        </div>
 
-          <!-- Live leaderboard -->
-          <div v-if="showResults" class="mini-leaderboard">
-            <h4>🏆 Top jugadores</h4>
-            <div v-for="(p, i) in leaderboard.slice(0, 5)" :key="i" class="lb-row">
-              <span class="lb-rank">{{ i + 1 }}</span>
-              <span class="lb-name">{{ p.name }}</span>
-              <span class="lb-score">{{ p.score }} pts</span>
+        <!-- PODIUM TOP 3 -->
+        <div class="podium" v-if="finalResults.leaderboard.length >= 3">
+          <div
+            v-for="(player, i) in finalResults.leaderboard.slice(0, 3)"
+            :key="player.name"
+            class="podium-item"
+            :class="'place-' + (i + 1)"
+          >
+            <div class="podium-rank">{{ ['🥇','🥈','🥉'][i] }}</div>
+            <div class="podium-name">{{ player.name }}</div>
+            <div class="podium-score">{{ player.score }} pts</div>
+            <div class="podium-detail">{{ player.correctCount }}/{{ finalResults.totalQuestions }} correctas</div>
+          </div>
+        </div>
+
+        <!-- TOP 10 COMPLETO -->
+        <div class="top10-section">
+          <h3>Top 10 Ranking</h3>
+          <div class="top10-list">
+            <div
+              v-for="(player, i) in finalResults.leaderboard"
+              :key="player.name"
+              class="top10-row"
+            >
+              <span class="top10-rank">{{ i + 1 }}</span>
+              <span class="top10-name">{{ player.name }}</span>
+              <span class="top10-correct">{{ player.correctCount }}/{{ finalResults.totalQuestions }}</span>
+              <span class="top10-score">{{ player.score }} pts</span>
             </div>
           </div>
-        </section>
-      </template>
+        </div>
 
-      <!-- FINISHED -->
-      <template v-else-if="status === 'finished'">
-        <section class="card results-card">
-          <h2>🏁 Partida finalizada</h2>
-          <div class="final-podium">
-            <div v-for="(p, i) in leaderboard.slice(0, 3)" :key="i" class="podium-place" :class="`place-${i + 1}`">
-              <div class="podium-avatar">{{ p.name.charAt(0).toUpperCase() }}</div>
-              <div class="podium-name">{{ p.name }}</div>
-              <div class="podium-score">{{ p.score }}</div>
-            </div>
-          </div>
-          <div class="full-leaderboard">
-            <div v-for="(p, i) in leaderboard" :key="i" class="lb-row-full">
-              <span class="lb-rank">{{ i + 1 }}</span>
-              <span class="lb-name">{{ p.name }}</span>
-              <span class="lb-score">{{ p.score }} pts</span>
-            </div>
-          </div>
-          <div class="results-actions">
-            <button class="btn-ghost" @click="reset">← Volver al Dashboard</button>
-            <button class="btn-primary" @click="restartSame">🔄 Reutilizar código</button>
-          </div>
-        </section>
-      </template>
-    </main>
+        <div class="results-actions">
+          <button class="btn-primary btn-large" @click="playAgain">
+            <span class="material-icons">replay</span> Nuevo Quiz
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -124,162 +179,242 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
+import axios from 'axios'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const route = useRoute()
 const router = useRouter()
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+
+const sessionCode = ref('')
+const sessionTitle = ref('')
+const questions = ref([])
+const questionCount = ref(0)
+const players = ref([])
+const copied = ref(false)
+const showFinalResults = ref(false)
+const finalResults = ref({ leaderboard: [], totalPlayers: 0, totalQuestions: 0 })
 
 const socket = ref(null)
-const joined = ref(false)
-const joining = ref(false)
-const joinCode = ref('')
-const joinError = ref('')
 
-const code = ref('')
-const title = ref('')
-const status = ref('waiting')
-const players = ref([])
-const questionCount = ref(0)
-const currentQuestion = ref(0)
-const totalQuestions = ref(0)
-const questionText = ref('')
-const questionOptions = ref([])
-const correctIndex = ref(-1)
-const showResults = ref(false)
-const selectedAnswers = ref({})
-const leaderboard = ref([])
-const timerPercent = ref(100)
-let timerInterval = null
+const joinUrl = computed(() => `${window.location.origin}/join?code=${sessionCode.value}`)
 
-const isLastQuestion = computed(() => currentQuestion.value >= totalQuestions.value - 1)
-
-onMounted(() => {
-  const codeFromUrl = route.query.code
-  if (codeFromUrl) { joinCode.value = codeFromUrl.toUpperCase(); joinAsHost() }
+const sortedPlayers = computed(() => {
+  return [...players.value].sort((a, b) => b.score - a.score)
 })
 
-onUnmounted(() => { if (socket.value) socket.value.disconnect(); clearInterval(timerInterval) })
+const totalAnswered = computed(() => {
+  return players.value.reduce((sum, p) => sum + (p.totalAnswered || 0), 0)
+})
 
-function joinAsHost() {
-  if (!joinCode.value.trim()) return
-  joining.value = true; joinError.value = ''
-  socket.value = io(API)
-  socket.value.emit('host:join', { code: joinCode.value.trim() })
+const avgProgress = computed(() => {
+  if (!players.value.length || !questionCount.value) return 0
+  const total = players.value.reduce((sum, p) => sum + (p.totalAnswered || 0), 0)
+  return Math.round((total / (players.value.length * questionCount.value)) * 100)
+})
 
-  socket.value.on('host:joined', ({ code: c, title: t, questionCount: qc, players: p }) => {
-    joined.value = true; joining.value = false
-    code.value = c; title.value = t; questionCount.value = qc; players.value = p; status.value = 'waiting'
+const totalResponses = computed(() => {
+  return finalResults.value.leaderboard.reduce((sum, p) => sum + (p.totalAnswered || 0), 0)
+})
+
+onMounted(async () => {
+  const code = route.params.sessionCode || route.query.code
+  if (!code) { router.push('/admin'); return }
+
+  sessionCode.value = code
+
+  try {
+    const res = await axios.get(`${API_URL}/api/sessions/${code}`)
+    sessionTitle.value = res.data.title || 'Quiz'
+    questions.value = res.data.questions || []
+    questionCount.value = res.data.questions?.length || 0
+    players.value = res.data.players || []
+  } catch (err) {
+    console.error('Error fetching session:', err)
+  }
+
+  // Conectar socket
+  socket.value = io(API_URL, {
+    transports: ['websocket', 'polling'],
+    reconnection: true
   })
 
-  socket.value.on('players:update', ({ players: p }) => { players.value = p })
-
-  socket.value.on('game:started', ({ questionCount: qc }) => {
-    status.value = 'active'; totalQuestions.value = qc; currentQuestion.value = 0; showResults.value = false
+  socket.value.on('connect', () => {
+    socket.value.emit('host:join', { code })
   })
 
-  socket.value.on('question:show', ({ index, total, text, options, timeLimit }) => {
-    currentQuestion.value = index; totalQuestions.value = total
-    questionText.value = text; questionOptions.value = options
-    correctIndex.value = -1; showResults.value = false; selectedAnswers.value = {}
-    startTimer(timeLimit)
+  socket.value.on('host:joined', ({ title, questionCount: qc, players: p }) => {
+    sessionTitle.value = title
+    questionCount.value = qc
+    players.value = p || []
   })
 
-  socket.value.on('question:results', ({ correctIndex: ci, leaderboard: lb }) => {
-    correctIndex.value = ci; showResults.value = true; leaderboard.value = lb; clearInterval(timerInterval)
+  socket.value.on('players:update', ({ players: p }) => {
+    players.value = p || []
   })
 
-  socket.value.on('game:ended', ({ leaderboard: lb }) => {
-    status.value = 'finished'; leaderboard.value = lb; clearInterval(timerInterval)
+  socket.value.on('quiz:finalResults', ({ title, leaderboard, totalQuestions, totalPlayers }) => {
+    finalResults.value = { title, leaderboard, totalQuestions, totalPlayers }
+    showFinalResults.value = true
   })
 
-  socket.value.on('error', ({ message }) => { joinError.value = message; joining.value = false })
+  socket.value.on('error', ({ message }) => {
+    alert(message)
+  })
+})
+
+onUnmounted(() => {
+  if (socket.value) socket.value.disconnect()
+})
+
+function endQuiz() {
+  if (!confirm('¿Cerrar el quiz? Los jugadores no podrán enviar más respuestas.')) return
+  socket.value.emit('host:end', { code: sessionCode.value })
 }
 
-function startGame() { socket.value.emit('host:start', { code: code.value }) }
-function nextQuestion() { socket.value.emit('host:next', { code: code.value }) }
-function endGame() { socket.value.emit('host:end', { code: code.value }) }
-
-function startTimer(seconds) {
-  clearInterval(timerInterval)
-  let remaining = seconds
-  timerPercent.value = 100
-  timerInterval = setInterval(() => {
-    remaining -= 0.1
-    timerPercent.value = (remaining / seconds) * 100
-    if (remaining <= 0) clearInterval(timerInterval)
-  }, 100)
+function exitGame() {
+  if (confirm('¿Salir de la sala?')) {
+    router.push('/admin')
+  }
 }
 
-function reset() { router.push('/dashboard') }
-function restartSame() { status.value = 'waiting'; players.value = []; socket.value.emit('host:join', { code: code.value }) }
+function playAgain() {
+  showFinalResults.value = false
+  finalResults.value = { leaderboard: [], totalPlayers: 0, totalQuestions: 0 }
+  router.push('/admin')
+}
+
+function copyCode() {
+  navigator.clipboard.writeText(sessionCode.value)
+  copied.value = true
+  setTimeout(() => copied.value = false, 2000)
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(joinUrl.value)
+  copied.value = true
+  setTimeout(() => copied.value = false, 2000)
+}
+
+function shareWhatsApp() {
+  const text = encodeURIComponent(`🎮 ¡Únete a mi quiz en QuizHive!\n\nCódigo: *${sessionCode.value}*\nTítulo: ${sessionTitle.value}\n\n${joinUrl.value}`)
+  window.open(`https://wa.me/?text=${text}`, '_blank')
+}
+
+function shareTelegram() {
+  const text = encodeURIComponent(`🎮 ¡Únete a mi quiz en QuizHive!\n\nCódigo: ${sessionCode.value}\nTítulo: ${sessionTitle.value}`)
+  const url = encodeURIComponent(joinUrl.value)
+  window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank')
+}
 </script>
 
 <style scoped>
-.host-view { min-height: 100vh; background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
-.host-header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
-.back-link { color: #64748b; text-decoration: none; font-size: .85rem; padding: .3rem .7rem; border: 1px solid #e2e8f0; border-radius: 6px; transition: all .2s; }
-.back-link:hover { color: #0f172a; border-color: #cbd5e1; }
-.logo { font-size: 1.3rem; color: #16a34a; font-weight: 700; margin-left: auto; }
-.host-main { max-width: 800px; margin: 2rem auto; padding: 0 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
-.card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
-h2 { margin: 0 0 .4rem; font-size: 1.25rem; color: #0f172a; }
-.subtitle { color: #64748b; font-size: .9rem; margin: 0 0 1.2rem; }
-.field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
-.field label { font-size: .85rem; color: #475569; font-weight: 500; }
-input { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; padding: .6rem .8rem; font-size: .95rem; outline: none; transition: border-color .2s, box-shadow .2s; }
-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
-.btn-primary { background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: .6rem 1.2rem; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .2s; }
-.btn-primary:hover:not(:disabled) { background: #15803d; }
-.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.btn-ghost { background: transparent; color: #64748b; border: 1px solid #e2e8f0; border-radius: 6px; padding: .5rem 1rem; cursor: pointer; font-size: .9rem; transition: all .2s; }
-.btn-ghost:hover { color: #0f172a; border-color: #cbd5e1; }
-.btn-large { font-size: 1.1rem; padding: .8rem 1.5rem; }
-.error-msg { color: #dc2626; font-size: .85rem; margin-top: .4rem; }
-.warn-msg { color: #b45309; font-size: .85rem; margin-top: .5rem; }
+.host-container { min-height: 100vh; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%); color: #e0e0e0; }
+.host-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1); }
+.logo-section { display: flex; align-items: center; gap: 0.75rem; }
+.host-logo { height: 36px; width: auto; }
+.logo-text { font-size: 1.25rem; font-weight: 800; background: linear-gradient(135deg, #00d4aa, #00a8e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.btn-exit { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; padding: 0.5rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.btn-exit:hover { background: rgba(255,50,50,0.2); border-color: rgba(255,50,50,0.4); color: #ff4444; }
 
-.join-card { max-width: 400px; margin: 0 auto; }
-.lobby-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-.code-badge { background: #f0fdf4; color: #16a34a; font-family: 'Courier New', monospace; font-size: 1.2rem; font-weight: 700; padding: .4rem .8rem; border-radius: 8px; border: 1px solid #bbf7d0; }
-.players-area { margin: 1rem 0; }
-.players-area h3 { font-size: .9rem; color: #64748b; margin-bottom: .7rem; }
-.empty-players { text-align: center; padding: 1.5rem; color: #94a3b8; border: 2px dashed #e2e8f0; border-radius: 8px; }
-.player-list { display: flex; flex-wrap: wrap; gap: .5rem; }
-.player-chip { display: flex; align-items: center; gap: .4rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 20px; padding: .3rem .8rem; }
-.player-avatar { width: 24px; height: 24px; background: #16a34a; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; }
-.player-name { font-size: .85rem; color: #0f172a; font-weight: 500; }
-.lobby-actions { margin-top: 1.5rem; text-align: center; }
+.lobby-view { max-width: 900px; margin: 0 auto; padding: 2rem; }
+.lobby-card { display: flex; flex-direction: column; gap: 2rem; }
+.session-info { text-align: center; }
+.session-title { font-size: 1.5rem; color: #fff; margin-bottom: 1.5rem; }
+.code-section { margin-bottom: 1rem; }
+.code-section label { display: block; color: #888; margin-bottom: 0.5rem; font-size: 0.9rem; }
+.code-display { display: inline-flex; align-items: center; gap: 1rem; padding: 1rem 2rem; background: linear-gradient(135deg, rgba(0,212,170,0.15), rgba(0,168,232,0.15)); border: 2px solid rgba(0,212,170,0.4); border-radius: 16px; cursor: pointer; transition: all 0.2s; }
+.code-display:hover { border-color: #00d4aa; box-shadow: 0 0 30px rgba(0,212,170,0.2); }
+.code-text { font-size: 2.5rem; font-weight: 800; letter-spacing: 6px; color: #00d4aa; font-family: 'Courier New', monospace; }
+.btn-copy { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
+.btn-copy:hover, .btn-copy.copied { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
+.copy-feedback { display: block; margin-top: 0.5rem; color: #00d4aa; font-size: 0.9rem; }
+.share-bar { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 1rem 0; }
+.share-label { color: #888; font-size: 0.9rem; margin-right: 0.5rem; }
+.btn-share-icon { width: 40px; height: 40px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-share-icon img { width: 20px; height: 20px; }
+.btn-share-icon .material-icons { font-size: 20px; }
+.btn-whatsapp { background: #25d366; color: #fff; }
+.btn-whatsapp:hover { background: #1ebe57; transform: scale(1.1); }
+.btn-telegram { background: #0088cc; color: #fff; }
+.btn-telegram:hover { background: #0077b3; transform: scale(1.1); }
+.btn-share-icon:not(.btn-whatsapp):not(.btn-telegram) { background: rgba(255,255,255,0.1); color: #ccc; }
+.btn-share-icon:not(.btn-whatsapp):not(.btn-telegram):hover { background: rgba(255,255,255,0.2); color: #fff; }
+.join-url { margin-top: 0.5rem; }
+.join-url code { background: rgba(0,0,0,0.3); padding: 0.4rem 0.8rem; border-radius: 6px; font-size: 0.8rem; color: #888; word-break: break-all; }
 
-.game-header { margin-bottom: 1.5rem; }
-.q-counter { font-size: .85rem; color: #64748b; font-weight: 600; }
-.timer-bar { height: 6px; background: #e2e8f0; border-radius: 3px; margin-top: .5rem; overflow: hidden; }
-.timer-fill { height: 100%; background: #16a34a; border-radius: 3px; transition: width .1s linear; }
-.q-text { font-size: 1.4rem; font-weight: 700; margin-bottom: 1.5rem; color: #0f172a; }
-.options-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; margin-bottom: 1.5rem; }
-.option-box { display: flex; align-items: center; gap: .75rem; background: #f8fafc; border: 2px solid #e2e8f0; border-radius: 10px; padding: 1rem; transition: all .2s; }
-.option-box.correct { background: #dcfce7; border-color: #16a34a; }
-.option-box.wrong { background: #fef2f2; border-color: #fca5a5; }
-.opt-letter { width: 32px; height: 32px; background: #e2e8f0; color: #475569; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .9rem; }
-.option-box.correct .opt-letter { background: #16a34a; color: #fff; }
-.opt-text { flex: 1; font-size: 1rem; }
-.opt-check { font-size: 1.2rem; }
-.game-actions { display: flex; justify-content: center; gap: .75rem; }
-.mini-leaderboard { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; }
-.mini-leaderboard h4 { font-size: .9rem; color: #64748b; margin-bottom: .5rem; }
-.lb-row { display: flex; align-items: center; gap: .75rem; padding: .4rem 0; }
-.lb-rank { width: 24px; text-align: center; font-weight: 700; color: #16a34a; }
-.lb-name { flex: 1; font-size: .9rem; }
-.lb-score { font-weight: 700; color: #0f172a; }
+.live-stats-host { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1rem; text-align: center; }
+.stat-value { display: block; font-size: 1.75rem; font-weight: 700; color: #00d4aa; }
+.stat-label { color: #888; font-size: 0.8rem; }
 
-.results-card { text-align: center; }
-.final-podium { display: flex; justify-content: center; align-items: flex-end; gap: 1rem; margin: 2rem 0; }
-.podium-place { display: flex; flex-direction: column; align-items: center; gap: .3rem; }
-.podium-place.place-1 .podium-avatar { width: 70px; height: 70px; font-size: 1.5rem; background: #fbbf24; }
-.podium-place.place-2 .podium-avatar { width: 55px; height: 55px; font-size: 1.2rem; background: #94a3b8; }
-.podium-place.place-3 .podium-avatar { width: 55px; height: 55px; font-size: 1.2rem; background: #b45309; }
-.podium-avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
-.podium-name { font-size: .85rem; font-weight: 600; color: #0f172a; }
-.podium-score { font-size: 1.1rem; font-weight: 800; color: #16a34a; }
-.full-leaderboard { max-width: 400px; margin: 0 auto 1.5rem; text-align: left; }
-.lb-row-full { display: flex; align-items: center; gap: .75rem; padding: .5rem 0; border-bottom: 1px solid #f1f5f9; }
-.results-actions { display: flex; justify-content: center; gap: .75rem; }
+.players-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.5rem; }
+.players-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.players-header h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: #fff; }
+.players-table { display: flex; flex-direction: column; gap: 0.4rem; }
+.table-header { display: grid; grid-template-columns: 40px 1fr 150px 60px; gap: 0.75rem; padding: 0.5rem 0.75rem; color: #888; font-size: 0.8rem; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1); }
+.player-row { display: grid; grid-template-columns: 40px 1fr 150px 60px; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px; align-items: center; }
+.player-row.top3 { background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.2); }
+.row-rank { font-weight: 700; color: #888; }
+.row-name { color: #ddd; font-weight: 500; }
+.row-progress { display: flex; align-items: center; gap: 0.5rem; }
+.progress-bar-mini { width: 80px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+.progress-fill-mini { height: 100%; background: linear-gradient(90deg, #00d4aa, #00a8e8); border-radius: 3px; transition: width 0.5s ease; }
+.progress-text { color: #888; font-size: 0.75rem; }
+.row-score { font-weight: 700; color: #00d4aa; text-align: right; }
+
+.questions-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.5rem; }
+.questions-section h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
+.questions-list { display: flex; flex-direction: column; gap: 0.5rem; max-height: 300px; overflow-y: auto; }
+.question-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
+.q-num { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; background: rgba(0,168,232,0.2); color: #00a8e8; border-radius: 6px; font-weight: 700; font-size: 0.8rem; flex-shrink: 0; }
+.q-text { flex: 1; color: #ccc; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.q-meta { color: #666; font-size: 0.75rem; flex-shrink: 0; }
+
+.controls-section { text-align: center; padding: 1rem 0; }
+.btn-end-quiz { display: inline-flex; align-items: center; gap: 0.5rem; padding: 1rem 2rem; background: linear-gradient(135deg, #ff4444, #cc0000); color: #fff; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+.btn-end-quiz:hover { transform: translateY(-2px); box-shadow: 0 4px 25px rgba(255,68,68,0.4); }
+.hint { margin-top: 0.75rem; color: #666; font-size: 0.85rem; }
+
+.final-results-view { max-width: 800px; margin: 0 auto; padding: 2rem; }
+.results-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 2rem; }
+.results-card h1 { display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: #fff; margin-bottom: 0.5rem; font-size: 1.75rem; }
+.results-card h2 { text-align: center; color: #00d4aa; margin-bottom: 1.5rem; font-size: 1.2rem; }
+.final-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 2rem; }
+.stat-box { text-align: center; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 12px; }
+.stat-num { display: block; font-size: 2rem; font-weight: 800; color: #00d4aa; }
+.stat-desc { color: #888; font-size: 0.85rem; }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 1rem; margin-bottom: 2rem; padding: 1rem 0; }
+.podium-item { text-align: center; padding: 1rem; border-radius: 16px; min-width: 140px; }
+.podium-item.place-1 { background: linear-gradient(135deg, rgba(255,215,0,0.15), rgba(255,215,0,0.05)); border: 1px solid rgba(255,215,0,0.3); order: 2; transform: scale(1.1); }
+.podium-item.place-2 { background: linear-gradient(135deg, rgba(192,192,192,0.15), rgba(192,192,192,0.05)); border: 1px solid rgba(192,192,192,0.3); order: 1; }
+.podium-item.place-3 { background: linear-gradient(135deg, rgba(205,127,50,0.15), rgba(205,127,50,0.05)); border: 1px solid rgba(205,127,50,0.3); order: 3; }
+.podium-rank { font-size: 2rem; margin-bottom: 0.5rem; }
+.podium-name { font-weight: 700; color: #fff; margin-bottom: 0.25rem; }
+.podium-score { color: #00d4aa; font-weight: 700; font-size: 1.1rem; }
+.podium-detail { color: #888; font-size: 0.8rem; }
+.top10-section { margin-bottom: 2rem; }
+.top10-section h3 { color: #ccc; margin-bottom: 1rem; font-size: 1rem; text-align: center; }
+.top10-list { display: flex; flex-direction: column; gap: 0.4rem; max-width: 500px; margin: 0 auto; }
+.top10-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
+.top10-rank { width: 28px; text-align: center; font-weight: 700; color: #888; }
+.top10-name { flex: 1; color: #ddd; }
+.top10-correct { color: #888; font-size: 0.85rem; }
+.top10-score { font-weight: 700; color: #00d4aa; min-width: 80px; text-align: right; }
+.results-actions { text-align: center; }
+.btn-primary { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; background: linear-gradient(135deg, #00d4aa, #00a8e8); color: #0f0f1a; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-decoration: none; }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,212,170,0.3); }
+.btn-large { padding: 1rem 2rem; font-size: 1.1rem; }
+
+@media (max-width: 768px) {
+  .lobby-view, .final-results-view { padding: 1rem; }
+  .code-text { font-size: 1.75rem; letter-spacing: 3px; }
+  .live-stats-host { grid-template-columns: 1fr; }
+  .table-header, .player-row { grid-template-columns: 30px 1fr 100px 50px; }
+  .progress-bar-mini { width: 50px; }
+  .podium { flex-direction: column; align-items: center; }
+  .podium-item.place-1 { order: 1; transform: none; }
+  .podium-item.place-2 { order: 2; }
+  .podium-item.place-3 { order: 3; }
+  .final-stats { grid-template-columns: 1fr; }
+}
 </style>
