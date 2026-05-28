@@ -13,13 +13,13 @@
 
         <!-- Nav Links -->
         <nav class="hidden gap-8 md:flex">
-          <router-link 
+          <!-- <router-link 
             to="/" 
             class="transition-colors text-label-md font-label-md"
             :class="$route.path === '/' ? 'text-secondary font-bold border-b-2 border-secondary pb-1' : 'text-on-surface-variant hover:text-secondary'"
           >
             Home
-          </router-link>
+          </router-link> -->
           <router-link 
             v-if="authStore.isAuthenticated"
             to="/dashboard" 
@@ -55,16 +55,16 @@
           </template>
           <template v-else>
             <router-link 
-              to="/login" 
+              to="/" 
               class="px-4 py-2 transition-colors text-on-surface-variant hover:text-secondary text-label-md font-label-md"
             >
-              Login
+              Inicio
             </router-link>
             <router-link 
-              to="/register" 
+              to="/login" 
               class="bg-primary text-on-primary px-6 py-2.5 rounded-lg text-label-md font-label-md hover:bg-secondary transition-all"
             >
-              Get Started
+              Login
             </router-link>
           </template>
         </div>
