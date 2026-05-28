@@ -1,22 +1,18 @@
 <template>
   <div class="dashboard">
-
-    <!-- ── Sidebar ── -->
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-icon">🦗</span>
-        <span class="logo-text">MANTIS</span>
+        <span class="logo-icon">🐝</span>
+        <span class="logo-text">QuizHive</span>
       </div>
-
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item active">
-          <span class="nav-icon">⬛</span> Mis Quizzes
+          <span class="nav-icon">📋</span> Mis Quizzes
         </router-link>
         <router-link to="/host" class="nav-item">
           <span class="nav-icon">▶️</span> Iniciar partida
         </router-link>
       </nav>
-
       <div class="sidebar-footer">
         <div class="admin-chip">
           <span class="admin-avatar">A</span>
@@ -25,10 +21,7 @@
       </div>
     </aside>
 
-    <!-- ── Main content ── -->
     <div class="main">
-
-      <!-- Topbar -->
       <header class="topbar">
         <div class="topbar-left">
           <h1>Mis Quizzes</h1>
@@ -39,50 +32,30 @@
         </button>
       </header>
 
-      <!-- Filtros -->
       <div class="filters">
         <div class="search-wrap">
           <span class="search-icon">🔍</span>
-          <input
-            v-model="search"
-            type="text"
-            placeholder="Buscar por nombre o código…"
-            class="search-input"
-          />
+          <input v-model="search" type="text" placeholder="Buscar por nombre o código…" class="search-input" />
         </div>
         <div class="filter-tabs">
-          <button
-            v-for="f in filters"
-            :key="f.value"
-            class="filter-tab"
-            :class="{ active: activeFilter === f.value }"
-            @click="activeFilter = f.value"
-          >{{ f.label }}</button>
+          <button v-for="f in filters" :key="f.value" class="filter-tab" :class="{ active: activeFilter === f.value }" @click="activeFilter = f.value">{{ f.label }}</button>
         </div>
       </div>
 
-      <!-- Grid de quizzes -->
       <div v-if="loading" class="loading-grid">
         <div v-for="i in 6" :key="i" class="skeleton-card" />
       </div>
 
       <div v-else-if="!filtered.length" class="empty-state">
-        <div class="empty-icon">🦗</div>
+        <div class="empty-icon">🐝</div>
         <h3>{{ search ? 'Sin resultados' : 'Aún no hay quizzes' }}</h3>
         <p>{{ search ? 'Intenta con otro término de búsqueda.' : 'Crea tu primer quiz y comparte el código con tus jugadores.' }}</p>
         <button v-if="!search" class="btn-new" @click="openCreateModal">+ Crear primer Quiz</button>
       </div>
 
       <TransitionGroup v-else name="cards" tag="div" class="quiz-grid">
-        <div
-          v-for="s in filtered"
-          :key="s.code"
-          class="quiz-card"
-          :class="`status-${s.status}`"
-        >
-          <!-- Color accent top bar -->
+        <div v-for="s in filtered" :key="s.code" class="quiz-card" :class="`status-${s.status}`">
           <div class="card-accent" :style="{ background: statusColor(s.status) }" />
-
           <div class="card-body">
             <div class="card-header-row">
               <span class="status-dot" :style="{ background: statusColor(s.status) }" />
@@ -96,108 +69,57 @@
                 </div>
               </div>
             </div>
-
             <h2 class="card-title" @click="goToEdit(s.code)">{{ s.title }}</h2>
-
             <div class="card-stats">
-              <div class="stat">
-                <span class="stat-num">{{ s.questions.length }}</span>
-                <span class="stat-lbl">preguntas</span>
-              </div>
+              <div class="stat"><span class="stat-num">{{ s.questions.length }}</span><span class="stat-lbl">preguntas</span></div>
               <div class="stat-divider" />
-              <div class="stat">
-                <span class="stat-num code-mono">{{ s.code }}</span>
-                <span class="stat-lbl">código</span>
-              </div>
+              <div class="stat"><span class="stat-num code-mono">{{ s.code }}</span><span class="stat-lbl">código</span></div>
               <div class="stat-divider" />
-              <div class="stat">
-                <span class="stat-num">{{ formatDate(s.createdAt) }}</span>
-                <span class="stat-lbl">creado</span>
-              </div>
+              <div class="stat"><span class="stat-num">{{ formatDate(s.createdAt) }}</span><span class="stat-lbl">creado</span></div>
             </div>
-
-            <!-- Warnings -->
             <p v-if="!s.questions.length" class="card-warn">⚠️ Sin preguntas — agrega al menos una para poder iniciar</p>
           </div>
-
           <div class="card-footer">
-            <button class="btn-code" @click="copyCode(s.code)" :class="{ copied: copiedCode === s.code }">
-              {{ copiedCode === s.code ? '✅ Copiado' : '📋 ' + s.code }}
-            </button>
-            <button
-              class="btn-edit"
-              @click="goToEdit(s.code)"
-            >Editar →</button>
+            <button class="btn-code" @click="copyCode(s.code)" :class="{ copied: copiedCode === s.code }">{{ copiedCode === s.code ? '✅ Copiado' : '📋 ' + s.code }}</button>
+            <button class="btn-edit" @click="goToEdit(s.code)">Editar →</button>
           </div>
         </div>
       </TransitionGroup>
-
     </div>
 
-    <!-- ── Modal Crear Quiz ── -->
     <Transition name="modal">
       <div v-if="showCreate" class="modal-overlay" @click.self="closeCreate">
         <div class="modal-card">
-          <div class="modal-header">
-            <h2>Nuevo Quiz</h2>
-            <button class="modal-close" @click="closeCreate">×</button>
-          </div>
-
-          <p class="modal-subtitle">
-            Dale un nombre a tu quiz. Después podrás agregar las preguntas de opción múltiple.
-          </p>
-
+          <div class="modal-header"><h2>Nuevo Quiz</h2><button class="modal-close" @click="closeCreate">×</button></div>
+          <p class="modal-subtitle">Dale un nombre a tu quiz. Después podrás agregar las preguntas de opción múltiple.</p>
           <div class="field">
             <label>Nombre del quiz *</label>
-            <input
-              ref="titleInput"
-              v-model="newTitle"
-              type="text"
-              placeholder="Ej. Trivia de Historia, Quiz del equipo…"
-              maxlength="100"
-              @keyup.enter="createQuiz"
-            />
+            <input ref="titleInput" v-model="newTitle" type="text" placeholder="Ej. Trivia de Historia, Quiz del equipo…" maxlength="100" @keyup.enter="createQuiz" />
             <span class="field-hint">{{ newTitle.length }}/100</span>
           </div>
-
           <p v-if="createError" class="error-msg">{{ createError }}</p>
-
           <div class="modal-actions">
             <button class="btn-cancel" @click="closeCreate">Cancelar</button>
-            <button
-              class="btn-create"
-              :disabled="creating || !newTitle.trim()"
-              @click="createQuiz"
-            >
-              <span v-if="creating" class="spinner" />
-              <span v-else>Crear Quiz →</span>
-            </button>
+            <button class="btn-create" :disabled="creating || !newTitle.trim()" @click="createQuiz"><span v-if="creating" class="spinner" /><span v-else>Crear Quiz →</span></button>
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- ── Confirm Delete ── -->
     <Transition name="modal">
       <div v-if="deleteTarget" class="modal-overlay" @click.self="deleteTarget = null">
         <div class="modal-card modal-sm">
           <h2>¿Eliminar quiz?</h2>
-          <p class="modal-subtitle">
-            Se eliminará <strong>{{ deleteTarget.title }}</strong> y todas sus preguntas. Esta acción no se puede deshacer.
-          </p>
+          <p class="modal-subtitle">Se eliminará <strong>{{ deleteTarget.title }}</strong> y todas sus preguntas. Esta acción no se puede deshacer.</p>
           <div class="modal-actions">
             <button class="btn-cancel" @click="deleteTarget = null">Cancelar</button>
-            <button class="btn-danger" :disabled="deleting" @click="doDelete">
-              {{ deleting ? 'Eliminando…' : 'Sí, eliminar' }}
-            </button>
+            <button class="btn-danger" :disabled="deleting" @click="doDelete">{{ deleting ? 'Eliminando…' : 'Sí, eliminar' }}</button>
           </div>
         </div>
       </div>
     </Transition>
 
-    <!-- Click-outside para dropdown -->
     <div v-if="openMenu" class="click-outside" @click="openMenu = null" />
-
   </div>
 </template>
 
@@ -206,49 +128,40 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
-const API    = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const router = useRouter()
 
-// ── Data ──
-const sessions     = ref([])
-const loading      = ref(true)
-const search       = ref('')
+const sessions = ref([])
+const loading = ref(true)
+const search = ref('')
 const activeFilter = ref('all')
-const openMenu     = ref(null)
-const copiedCode   = ref(null)
-
-// create modal
-const showCreate  = ref(false)
-const newTitle    = ref('')
-const creating    = ref(false)
+const openMenu = ref(null)
+const copiedCode = ref(null)
+const showCreate = ref(false)
+const newTitle = ref('')
+const creating = ref(false)
 const createError = ref('')
-const titleInput  = ref(null)
-
-// delete confirm
+const titleInput = ref(null)
 const deleteTarget = ref(null)
-const deleting     = ref(false)
+const deleting = ref(false)
 
 const filters = [
-  { label: 'Todos',      value: 'all'      },
-  { label: 'En espera',  value: 'waiting'  },
-  { label: 'En juego',   value: 'active'   },
-  { label: 'Finalizados',value: 'finished' },
+  { label: 'Todos', value: 'all' },
+  { label: 'En espera', value: 'waiting' },
+  { label: 'En juego', value: 'active' },
+  { label: 'Finalizados', value: 'finished' },
 ]
 
-// ── Computed ──
 const filtered = computed(() => {
   let list = sessions.value
   if (activeFilter.value !== 'all') list = list.filter(s => s.status === activeFilter.value)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
-    list = list.filter(s =>
-      s.title.toLowerCase().includes(q) || s.code.toLowerCase().includes(q)
-    )
+    list = list.filter(s => s.title.toLowerCase().includes(q) || s.code.toLowerCase().includes(q))
   }
   return list
 })
 
-// ── Lifecycle ──
 onMounted(fetchSessions)
 
 async function fetchSessions() {
@@ -260,53 +173,32 @@ async function fetchSessions() {
   finally { loading.value = false }
 }
 
-// ── Acciones ──
 function openCreateModal() {
-  showCreate.value  = true
-  newTitle.value    = ''
+  showCreate.value = true
+  newTitle.value = ''
   createError.value = ''
   nextTick(() => titleInput.value?.focus())
 }
-
-function closeCreate() {
-  showCreate.value = false
-}
+function closeCreate() { showCreate.value = false }
 
 async function createQuiz() {
   if (!newTitle.value.trim() || creating.value) return
-  creating.value    = true
+  creating.value = true
   createError.value = ''
   try {
     const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() })
     sessions.value.unshift(data)
     closeCreate()
-    // navegar directo al editor del nuevo quiz
     router.push(`/admin?code=${data.code}`)
   } catch (e) {
     createError.value = e.response?.data?.error || 'Error al crear el quiz.'
-  } finally {
-    creating.value = false
-  }
+  } finally { creating.value = false }
 }
 
-function goToEdit(code) {
-  openMenu.value = null
-  router.push(`/admin?code=${code}`)
-}
-
-function startSession(code) {
-  openMenu.value = null
-  router.push(`/host?code=${code}`)
-}
-
-function toggleMenu(code) {
-  openMenu.value = openMenu.value === code ? null : code
-}
-
-function confirmDelete(session) {
-  openMenu.value    = null
-  deleteTarget.value = session
-}
+function goToEdit(code) { openMenu.value = null; router.push(`/admin?code=${code}`) }
+function startSession(code) { openMenu.value = null; router.push(`/host?code=${code}`) }
+function toggleMenu(code) { openMenu.value = openMenu.value === code ? null : code }
+function confirmDelete(session) { openMenu.value = null; deleteTarget.value = session }
 
 async function doDelete() {
   if (!deleteTarget.value) return
@@ -315,11 +207,8 @@ async function doDelete() {
     await axios.delete(`${API}/api/sessions/${deleteTarget.value.code}`)
     sessions.value = sessions.value.filter(s => s.code !== deleteTarget.value.code)
     deleteTarget.value = null
-  } catch {
-    alert('Error al eliminar.')
-  } finally {
-    deleting.value = false
-  }
+  } catch { alert('Error al eliminar.') }
+  finally { deleting.value = false }
 }
 
 async function copyCode(code) {
@@ -328,544 +217,109 @@ async function copyCode(code) {
   setTimeout(() => { if (copiedCode.value === code) copiedCode.value = null }, 2000)
 }
 
-// ── Helpers ──
-function statusLabel(s) {
-  return { waiting: 'En espera', active: 'En juego', finished: 'Finalizado' }[s] ?? s
-}
-function statusColor(s) {
-  return { waiting: '#58c458', active: '#f0a500', finished: '#8b949e' }[s] ?? '#444'
-}
-function formatDate(d) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
-}
+function statusLabel(s) { return { waiting: 'En espera', active: 'En juego', finished: 'Finalizado' }[s] ?? s }
+function statusColor(s) { return { waiting: '#16a34a', active: '#f59e0b', finished: '#9ca3af' }[s] ?? '#6b7280' }
+function formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) }
 </script>
 
 <style scoped>
-/* ── Reset & base ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-.dashboard {
-  display: flex;
-  min-height: 100vh;
-  background: #0a0e14;
-  color: #e6edf3;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-}
-
-/* ── Sidebar ── */
-.sidebar {
-  width: 220px;
-  background: #0d1117;
-  border-right: 1px solid #1e2a1e;
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  position: sticky;
-  top: 0;
-  height: 100vh;
-}
-.sidebar-logo {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: 1.4rem 1.2rem;
-  border-bottom: 1px solid #1e2a1e;
-}
+.dashboard { display: flex; min-height: 100vh; background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+.sidebar { width: 240px; background: #ffffff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
+.sidebar-logo { display: flex; align-items: center; gap: .6rem; padding: 1.4rem 1.2rem; border-bottom: 1px solid #e2e8f0; }
 .logo-icon { font-size: 1.4rem; }
-.logo-text {
-  font-size: 1.1rem;
-  font-weight: 800;
-  letter-spacing: .12rem;
-  color: #58c458;
-}
-.sidebar-nav {
-  flex: 1;
-  padding: 1rem .6rem;
-  display: flex;
-  flex-direction: column;
-  gap: .25rem;
-}
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  padding: .55rem .8rem;
-  border-radius: 7px;
-  color: #8b949e;
-  text-decoration: none;
-  font-size: .88rem;
-  font-weight: 500;
-  transition: background .15s, color .15s;
-}
-.nav-item:hover, .nav-item.active {
-  background: #1a2e1a;
-  color: #58c458;
-}
+.logo-text { font-size: 1.15rem; font-weight: 800; letter-spacing: .08rem; color: #16a34a; }
+.sidebar-nav { flex: 1; padding: 1rem .6rem; display: flex; flex-direction: column; gap: .25rem; }
+.nav-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .8rem; border-radius: 8px; color: #64748b; text-decoration: none; font-size: .88rem; font-weight: 500; transition: background .15s, color .15s; }
+.nav-item:hover, .nav-item.active { background: #f0fdf4; color: #16a34a; }
 .nav-icon { font-size: .9rem; }
-.sidebar-footer {
-  padding: 1rem 1.2rem;
-  border-top: 1px solid #1e2a1e;
-}
-.admin-chip {
-  display: flex;
-  align-items: center;
-  gap: .5rem;
-  font-size: .85rem;
-  color: #8b949e;
-}
-.admin-avatar {
-  width: 28px;
-  height: 28px;
-  background: #2d4a2d;
-  color: #58c458;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: .8rem;
-  font-weight: 700;
-}
-
-/* ── Main ── */
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  padding: 2rem 2.5rem;
-  gap: 1.5rem;
-}
-
-/* ── Topbar ── */
-.topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
+.sidebar-footer { padding: 1rem 1.2rem; border-top: 1px solid #e2e8f0; }
+.admin-chip { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: #64748b; }
+.admin-avatar { width: 28px; height: 28px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 2rem 2.5rem; gap: 1.5rem; }
+.topbar { display: flex; justify-content: space-between; align-items: flex-end; }
 .topbar-left { display: flex; align-items: baseline; gap: .75rem; }
-h1 { font-size: 1.6rem; font-weight: 800; color: #e6edf3; }
-.quiz-count {
-  font-size: .85rem;
-  color: #8b949e;
-  background: #161b22;
-  border: 1px solid #30363d;
-  padding: .2rem .6rem;
-  border-radius: 20px;
-}
-
-/* ── Btn new ── */
-.btn-new {
-  background: #238636;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: .55rem 1.2rem;
-  font-size: .9rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  transition: background .2s, transform .15s;
-}
-.btn-new:hover { background: #2ea043; transform: translateY(-1px); }
+h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
+.quiz-count { font-size: .85rem; color: #64748b; background: #ffffff; border: 1px solid #e2e8f0; padding: .2rem .6rem; border-radius: 20px; }
+.btn-new { background: #16a34a; color: #fff; border: none; border-radius: 8px; padding: .55rem 1.2rem; font-size: .9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: .4rem; transition: background .2s, transform .15s; }
+.btn-new:hover { background: #15803d; transform: translateY(-1px); }
 .plus { font-size: 1.1rem; line-height: 1; }
-
-/* ── Filters ── */
-.filters {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.search-wrap {
-  position: relative;
-  flex: 1;
-  min-width: 200px;
-  max-width: 340px;
-}
-.search-icon {
-  position: absolute;
-  left: .75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: .85rem;
-  pointer-events: none;
-}
-.search-input {
-  width: 100%;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 7px;
-  color: #e6edf3;
-  padding: .5rem .75rem .5rem 2.2rem;
-  font-size: .88rem;
-  outline: none;
-  transition: border-color .2s;
-}
-.search-input:focus { border-color: #58c458; }
-.filter-tabs {
-  display: flex;
-  gap: .3rem;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  padding: .25rem;
-}
-.filter-tab {
-  background: transparent;
-  border: none;
-  color: #8b949e;
-  padding: .3rem .75rem;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: .82rem;
-  font-weight: 500;
-  transition: background .15s, color .15s;
-}
-.filter-tab.active {
-  background: #2d4a2d;
-  color: #58c458;
-}
-
-/* ── Grid ── */
-.quiz-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  align-content: start;
-}
-
-/* ── Quiz Card ── */
-.quiz-card {
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 12px;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  transition: border-color .2s, transform .2s, box-shadow .2s;
-  cursor: default;
-  position: relative;
-}
-.quiz-card:hover {
-  border-color: #444e44;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,.35);
-}
-.card-accent {
-  height: 3px;
-  width: 100%;
-}
-.card-body {
-  padding: 1rem 1rem .6rem;
-  flex: 1;
-}
-.card-header-row {
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  margin-bottom: .7rem;
-  position: relative;
-}
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-label {
-  font-size: .75rem;
-  color: #8b949e;
-  flex: 1;
-  text-transform: uppercase;
-  letter-spacing: .05rem;
-  font-weight: 600;
-}
+.filters { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+.search-wrap { position: relative; flex: 1; min-width: 200px; max-width: 340px; }
+.search-icon { position: absolute; left: .75rem; top: 50%; transform: translateY(-50%); font-size: .85rem; pointer-events: none; }
+.search-input { width: 100%; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; color: #1e293b; padding: .5rem .75rem .5rem 2.2rem; font-size: .88rem; outline: none; transition: border-color .2s, box-shadow .2s; }
+.search-input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.filter-tabs { display: flex; gap: .3rem; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: .25rem; }
+.filter-tab { background: transparent; border: none; color: #64748b; padding: .3rem .75rem; border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 500; transition: background .15s, color .15s; }
+.filter-tab.active { background: #dcfce7; color: #16a34a; }
+.quiz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; align-content: start; }
+.quiz-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; transition: border-color .2s, transform .2s, box-shadow .2s; cursor: default; position: relative; }
+.quiz-card:hover { border-color: #bbf7d0; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.card-accent { height: 3px; width: 100%; }
+.card-body { padding: 1rem 1rem .6rem; flex: 1; }
+.card-header-row { display: flex; align-items: center; gap: .4rem; margin-bottom: .7rem; position: relative; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.status-label { font-size: .75rem; color: #64748b; flex: 1; text-transform: uppercase; letter-spacing: .05rem; font-weight: 600; }
 .card-menu { position: relative; }
-.menu-btn {
-  background: transparent;
-  border: none;
-  color: #8b949e;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: .1rem .4rem;
-  border-radius: 4px;
-  line-height: 1;
-  transition: background .15s;
-}
-.menu-btn:hover { background: #21262d; color: #e6edf3; }
-.dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: #21262d;
-  border: 1px solid #30363d;
-  border-radius: 8px;
-  min-width: 140px;
-  z-index: 50;
-  box-shadow: 0 8px 24px rgba(0,0,0,.5);
-  overflow: hidden;
-}
-.dropdown button {
-  display: block;
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: #e6edf3;
-  padding: .55rem .9rem;
-  text-align: left;
-  font-size: .88rem;
-  cursor: pointer;
-  transition: background .15s;
-}
-.dropdown button:hover { background: #30363d; }
-.dropdown button.danger { color: #f85149; }
+.menu-btn { background: transparent; border: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: .1rem .4rem; border-radius: 4px; line-height: 1; transition: background .15s; }
+.menu-btn:hover { background: #f1f5f9; color: #475569; }
+.dropdown { position: absolute; right: 0; top: calc(100% + 4px); background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; min-width: 140px; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.1); overflow: hidden; }
+.dropdown button { display: block; width: 100%; background: transparent; border: none; color: #334155; padding: .55rem .9rem; text-align: left; font-size: .88rem; cursor: pointer; transition: background .15s; }
+.dropdown button:hover { background: #f8fafc; }
+.dropdown button.danger { color: #dc2626; }
 .dropdown button:disabled { opacity: .4; cursor: not-allowed; }
-
-.card-title {
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.35;
-  margin-bottom: .85rem;
-  cursor: pointer;
-  transition: color .15s;
-}
-.card-title:hover { color: #58c458; }
-
-.card-stats {
-  display: flex;
-  align-items: center;
-  gap: .6rem;
-  margin-bottom: .5rem;
-}
+.card-title { font-size: 1rem; font-weight: 700; line-height: 1.35; margin-bottom: .85rem; cursor: pointer; transition: color .15s; color: #0f172a; }
+.card-title:hover { color: #16a34a; }
+.card-stats { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
 .stat { display: flex; flex-direction: column; align-items: center; }
-.stat-num {
-  font-size: .9rem;
-  font-weight: 700;
-  color: #e6edf3;
-}
-.stat-lbl {
-  font-size: .68rem;
-  color: #8b949e;
-  text-transform: uppercase;
-  letter-spacing: .04rem;
-}
-.code-mono {
-  font-family: 'Courier New', monospace;
-  letter-spacing: .1rem;
-  color: #58c458;
-  font-size: .82rem;
-}
-.stat-divider {
-  width: 1px;
-  height: 28px;
-  background: #30363d;
-}
-.card-warn {
-  font-size: .75rem;
-  color: #e3b341;
-  background: #2d2500;
-  border: 1px solid #e3b34130;
-  border-radius: 5px;
-  padding: .3rem .6rem;
-  margin-top: .4rem;
-}
-
-.card-footer {
-  padding: .75rem 1rem;
-  border-top: 1px solid #21262d;
-  display: flex;
-  gap: .5rem;
-  justify-content: space-between;
-  align-items: center;
-}
-.btn-code {
-  background: #0d1117;
-  border: 1px solid #30363d;
-  color: #8b949e;
-  border-radius: 6px;
-  padding: .3rem .7rem;
-  font-size: .8rem;
-  font-family: 'Courier New', monospace;
-  cursor: pointer;
-  transition: all .2s;
-}
-.btn-code:hover { border-color: #58c458; color: #58c458; }
-.btn-code.copied { border-color: #58c458; color: #58c458; background: #1a2e1a; }
-.btn-edit {
-  background: transparent;
-  border: none;
-  color: #58c458;
-  font-size: .85rem;
-  font-weight: 600;
-  cursor: pointer;
-  padding: .3rem .5rem;
-  transition: color .15s;
-}
-.btn-edit:hover { color: #7ee07e; }
-
-/* ── Skeleton ── */
-.loading-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-}
-.skeleton-card {
-  height: 190px;
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 12px;
-  animation: pulse 1.4s ease-in-out infinite;
-}
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .4; }
-}
-
-/* ── Empty state ── */
-.empty-state {
-  text-align: center;
-  padding: 4rem 2rem;
-  color: #8b949e;
-}
+.stat-num { font-size: .9rem; font-weight: 700; color: #0f172a; }
+.stat-lbl { font-size: .68rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .04rem; }
+.code-mono { font-family: 'Courier New', monospace; letter-spacing: .1rem; color: #16a34a; font-size: .82rem; }
+.stat-divider { width: 1px; height: 28px; background: #e2e8f0; }
+.card-warn { font-size: .75rem; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; border-radius: 5px; padding: .3rem .6rem; margin-top: .4rem; }
+.card-footer { padding: .75rem 1rem; border-top: 1px solid #f1f5f9; display: flex; gap: .5rem; justify-content: space-between; align-items: center; }
+.btn-code { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; border-radius: 6px; padding: .3rem .7rem; font-size: .8rem; font-family: 'Courier New', monospace; cursor: pointer; transition: all .2s; }
+.btn-code:hover { border-color: #16a34a; color: #16a34a; }
+.btn-code.copied { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+.btn-edit { background: transparent; border: none; color: #16a34a; font-size: .85rem; font-weight: 600; cursor: pointer; padding: .3rem .5rem; transition: color .15s; }
+.btn-edit:hover { color: #15803d; }
+.loading-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+.skeleton-card { height: 190px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+.empty-state { text-align: center; padding: 4rem 2rem; color: #94a3b8; }
 .empty-icon { font-size: 3rem; margin-bottom: 1rem; }
-.empty-state h3 { font-size: 1.1rem; color: #e6edf3; margin-bottom: .4rem; }
-.empty-state p  { font-size: .9rem; margin-bottom: 1.5rem; }
-
-/* ── Modal ── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  padding: 1rem;
-}
-.modal-card {
-  background: #161b22;
-  border: 1px solid #30363d;
-  border-radius: 14px;
-  padding: 1.75rem;
-  width: 100%;
-  max-width: 460px;
-}
+.empty-state h3 { font-size: 1.1rem; color: #334155; margin-bottom: .4rem; }
+.empty-state p { font-size: .9rem; margin-bottom: 1.5rem; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
+.modal-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.75rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.1); }
 .modal-sm { max-width: 380px; }
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: .5rem;
-}
-.modal-header h2 { font-size: 1.2rem; }
-.modal-close {
-  background: transparent;
-  border: none;
-  color: #8b949e;
-  font-size: 1.4rem;
-  cursor: pointer;
-  line-height: 1;
-  padding: .1rem .3rem;
-  border-radius: 4px;
-}
-.modal-close:hover { color: #e6edf3; }
-.modal-subtitle { color: #8b949e; font-size: .88rem; margin-bottom: 1.2rem; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.modal-header h2 { font-size: 1.2rem; color: #0f172a; }
+.modal-close { background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1; padding: .1rem .3rem; border-radius: 4px; }
+.modal-close:hover { color: #475569; }
+.modal-subtitle { color: #64748b; font-size: .88rem; margin-bottom: 1.2rem; }
 .field { display: flex; flex-direction: column; gap: .35rem; margin-bottom: .5rem; }
-.field label { font-size: .82rem; color: #8b949e; font-weight: 600; }
-.field input {
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 7px;
-  color: #e6edf3;
-  padding: .6rem .8rem;
-  font-size: .95rem;
-  outline: none;
-  transition: border-color .2s;
-}
-.field input:focus { border-color: #58c458; }
-.field-hint { font-size: .75rem; color: #8b949e; align-self: flex-end; }
-.error-msg { color: #f85149; font-size: .83rem; margin-bottom: .5rem; }
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: .75rem;
-  margin-top: 1.2rem;
-}
-.btn-cancel {
-  background: transparent;
-  border: 1px solid #30363d;
-  color: #8b949e;
-  border-radius: 7px;
-  padding: .5rem 1rem;
-  font-size: .9rem;
-  cursor: pointer;
-  transition: all .2s;
-}
-.btn-cancel:hover { color: #e6edf3; border-color: #8b949e; }
-.btn-create {
-  background: #238636;
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: .55rem 1.3rem;
-  font-size: .9rem;
-  font-weight: 700;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: .4rem;
-  transition: background .2s;
-}
-.btn-create:hover:not(:disabled) { background: #2ea043; }
+.field label { font-size: .82rem; color: #475569; font-weight: 600; }
+.field input { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 7px; color: #1e293b; padding: .6rem .8rem; font-size: .95rem; outline: none; transition: border-color .2s, box-shadow .2s; }
+.field input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.field-hint { font-size: .75rem; color: #94a3b8; align-self: flex-end; }
+.error-msg { color: #dc2626; font-size: .83rem; margin-bottom: .5rem; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.2rem; }
+.btn-cancel { background: transparent; border: 1px solid #e2e8f0; color: #64748b; border-radius: 7px; padding: .5rem 1rem; font-size: .9rem; cursor: pointer; transition: all .2s; }
+.btn-cancel:hover { color: #475569; border-color: #cbd5e1; }
+.btn-create { background: #16a34a; color: #fff; border: none; border-radius: 7px; padding: .55rem 1.3rem; font-size: .9rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: .4rem; transition: background .2s; }
+.btn-create:hover:not(:disabled) { background: #15803d; }
 .btn-create:disabled { opacity: .5; cursor: not-allowed; }
-.btn-danger {
-  background: #b91c1c;
-  color: #fff;
-  border: none;
-  border-radius: 7px;
-  padding: .55rem 1.1rem;
-  font-size: .9rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background .2s;
-}
-.btn-danger:hover:not(:disabled) { background: #dc2626; }
+.btn-danger { background: #dc2626; color: #fff; border: none; border-radius: 7px; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 700; cursor: pointer; transition: background .2s; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255,255,255,.3);
-  border-top-color: #fff;
-  border-radius: 50%;
-  animation: spin .6s linear infinite;
-}
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-
-/* ── Click-outside overlay ── */
-.click-outside {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-}
-
-/* ── Transitions ── */
+.click-outside { position: fixed; inset: 0; z-index: 40; }
 .modal-enter-active, .modal-leave-active { transition: opacity .2s, transform .2s; }
-.modal-enter-from, .modal-leave-to       { opacity: 0; transform: scale(.97); }
+.modal-enter-from, .modal-leave-to { opacity: 0; transform: scale(.97); }
 .cards-enter-active, .cards-leave-active { transition: all .22s ease; }
-.cards-enter-from  { opacity: 0; transform: translateY(10px); }
-.cards-leave-to    { opacity: 0; transform: scale(.95); }
-
-/* ── Responsive ── */
-@media (max-width: 768px) {
-  .sidebar { display: none; }
-  .main { padding: 1rem; }
-  .topbar { flex-direction: column; align-items: flex-start; gap: .75rem; }
-  .filters { flex-direction: column; align-items: stretch; }
-  .search-wrap { max-width: 100%; }
-}
+.cards-enter-from { opacity: 0; transform: translateY(10px); }
+.cards-leave-to { opacity: 0; transform: scale(.95); }
+@media (max-width: 768px) { .sidebar { display: none; } .main { padding: 1rem; } .topbar { flex-direction: column; align-items: flex-start; gap: .75rem; } .filters { flex-direction: column; align-items: stretch; } .search-wrap { max-width: 100%; } }
 </style>

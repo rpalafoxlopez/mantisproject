@@ -1,139 +1,90 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background px-4">
-    <div class="w-full max-w-md">
-      <!-- Logo -->
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-secondary/10 text-secondary mb-4">
-          <span class="material-symbols-outlined text-3xl">group</span>
+  <div class="join-view">
+    <header class="join-header">
+      <router-link to="/" class="back-link">← Inicio</router-link>
+      <span class="logo">🐝 QuizHive</span>
+    </header>
+
+    <main class="join-main">
+      <section class="card join-card">
+        <h2>🎮 Unirse a una partida</h2>
+        <p class="subtitle">Ingresa el código de la partida y tu nombre para comenzar.</p>
+
+        <div class="field">
+          <label>Código de la partida</label>
+          <input v-model="code" type="text" placeholder="Ej. ABC123" maxlength="6" @keyup.enter="focusName" />
         </div>
-        <h1 class="text-2xl font-bold text-primary">Unirse a Partida</h1>
-        <p class="text-on-surface-variant mt-2">Ingresa el código y prepárate para competir</p>
-      </div>
 
-      <div class="card p-8">
-        <form @submit.prevent="joinGame" class="space-y-5">
-          <div>
-            <label class="block text-sm font-medium text-on-surface mb-1.5">Código de Sala</label>
-            <input 
-              v-model="sessionCode" 
-              class="input text-center text-2xl font-black tracking-widest uppercase"
-              placeholder="AB2D"
-              maxlength="4"
-              @input="sessionCode = sessionCode.toUpperCase().replace(/[^A-Z0-9]/g, '')"
-              required
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-on-surface mb-1.5">Tu Nombre</label>
-            <input 
-              v-model="playerName" 
-              class="input"
-              placeholder="¿Cómo te llamas?"
-              maxlength="20"
-              required
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-on-surface mb-1.5">Elige tu Avatar</label>
-            <div class="grid grid-cols-5 gap-2">
-              <button
-                v-for="avatar in avatars"
-                :key="avatar"
-                type="button"
-                class="h-12 rounded-xl border-2 text-xl transition-all hover:scale-110"
-                :class="selectedAvatar === avatar ? 'border-secondary bg-secondary/10' : 'border-gray-200 hover:border-secondary/50'"
-                @click="selectedAvatar = avatar"
-              >
-                {{ avatar }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="error" class="error-text flex items-center gap-2">
-            <span class="material-symbols-outlined text-sm">error</span>
-            {{ error }}
-          </div>
-
-          <button 
-            type="submit"
-            class="btn btn-primary w-full"
-            :disabled="!canJoin || joining"
-          >
-            <span v-if="joining" class="spinner"></span>
-            <span v-else class="flex items-center gap-2">
-              <span class="material-symbols-outlined">login</span>
-              ¡Entrar!
-            </span>
-          </button>
-        </form>
-
-        <div class="mt-6 text-center">
-          <router-link to="/" class="text-sm text-on-surface-variant hover:text-secondary transition-colors flex items-center justify-center gap-1">
-            <span class="material-symbols-outlined text-base">arrow_back</span>
-            Volver al inicio
-          </router-link>
+        <div class="field">
+          <label>Tu nombre</label>
+          <input ref="nameInput" v-model="name" type="text" placeholder="Ej. Juanito" maxlength="20" @keyup.enter="joinGame" />
         </div>
-      </div>
-    </div>
+
+        <button class="btn-primary btn-large" :disabled="joining || !code.trim() || !name.trim()" @click="joinGame">
+          <span v-if="joining">Uniendo…</span><span v-else>🚀 ¡Vamos!</span>
+        </button>
+
+        <p v-if="error" class="error-msg">{{ error }}</p>
+      </section>
+    </main>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useSocketStore } from '../stores/socket.js'
-import { useGameStore } from '../stores/game.js'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { io } from 'socket.io-client'
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const route = useRoute()
 const router = useRouter()
-const socketStore = useSocketStore()
-const gameStore = useGameStore()
 
-const sessionCode = ref('')
-const playerName = ref('')
-const selectedAvatar = ref('')
-const error = ref('')
+const code = ref('')
+const name = ref('')
 const joining = ref(false)
-
-const avatars = ['🦁', '🦊', '🐼', '🐨', '🐯', '🐷', '🐸', '🐙', '🦄', '🐲']
-
-const canJoin = computed(() => 
-  sessionCode.value.length === 4 && 
-  playerName.value.trim().length >= 2
-)
+const error = ref('')
+const nameInput = ref(null)
 
 onMounted(() => {
-  socketStore.connect()
-  if (!selectedAvatar.value) {
-    selectedAvatar.value = avatars[Math.floor(Math.random() * avatars.length)]
-  }
+  const codeFromUrl = route.query.code
+  if (codeFromUrl) code.value = codeFromUrl.toUpperCase()
 })
 
+function focusName() { nameInput.value?.focus() }
+
 function joinGame() {
-  if (!canJoin.value) return
+  if (!code.value.trim() || !name.value.trim() || joining.value) return
+  joining.value = true; error.value = ''
+  const socket = io(API)
+  socket.emit('player:join', { code: code.value.trim(), name: name.value.trim() })
 
-  joining.value = true
-  error.value = ''
-
-  socketStore.emit('player:join', {
-    sessionCode: sessionCode.value,
-    playerName: playerName.value.trim(),
-    avatar: selectedAvatar.value
+  socket.on('player:joined', ({ code: c, title }) => {
+    localStorage.setItem('quizhive_player_code', c)
+    localStorage.setItem('quizhive_player_name', name.value.trim())
+    router.push(`/play?code=${c}&name=${encodeURIComponent(name.value.trim())}`)
   })
 
-  socketStore.on('player:joined', ({ sessionCode, player, sessionStatus, totalQuestions }) => {
-    gameStore.setSession(sessionCode, false)
-    gameStore.setPlayer(player.name, player.avatar)
-    gameStore.setStatus(sessionStatus)
-    gameStore.totalQuestions = totalQuestions
-    joining.value = false
-    router.push(`/play/${sessionCode}`)
-  })
-
-  socketStore.on('join:error', ({ message }) => {
-    error.value = message
-    joining.value = false
-  })
+  socket.on('error', ({ message }) => { error.value = message; joining.value = false })
 }
 </script>
+
+<style scoped>
+.join-view { min-height: 100vh; background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+.join-header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; gap: 1rem; }
+.back-link { color: #64748b; text-decoration: none; font-size: .85rem; padding: .3rem .7rem; border: 1px solid #e2e8f0; border-radius: 6px; transition: all .2s; }
+.back-link:hover { color: #0f172a; border-color: #cbd5e1; }
+.logo { font-size: 1.3rem; color: #16a34a; font-weight: 700; margin-left: auto; }
+.join-main { max-width: 400px; margin: 3rem auto; padding: 0 1rem; }
+.card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+h2 { margin: 0 0 .4rem; font-size: 1.25rem; color: #0f172a; }
+.subtitle { color: #64748b; font-size: .9rem; margin: 0 0 1.2rem; }
+.field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
+.field label { font-size: .85rem; color: #475569; font-weight: 500; }
+input { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; padding: .6rem .8rem; font-size: .95rem; outline: none; transition: border-color .2s, box-shadow .2s; }
+input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+.btn-primary { background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: .6rem 1.2rem; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .2s; width: 100%; }
+.btn-primary:hover:not(:disabled) { background: #15803d; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-large { font-size: 1.1rem; padding: .8rem; }
+.error-msg { color: #dc2626; font-size: .85rem; margin-top: .4rem; text-align: center; }
+</style>

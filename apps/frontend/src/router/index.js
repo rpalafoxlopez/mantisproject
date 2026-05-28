@@ -10,55 +10,14 @@ import PlayView       from '../views/PlayView.vue'
 import ResultsView    from '../views/ResultsView.vue'
 
 const routes = [
-  {
-    path: '/',
-    name: 'home',
-    component: HomeView
-  },
-  {
-    // Dashboard: vista principal del admin, muestra todos los quizzes
-    path: '/dashboard',
-    name: 'dashboard',
-    component: DashboardView,
-    meta: { title: 'Dashboard — MANTIS' }
-  },
-  {
-    // Editor de quiz: se accede con ?code=XXXXXX
-    // Si no hay code, AdminView crea uno nuevo al aterrizar
-    path: '/admin',
-    name: 'admin',
-    component: AdminView,
-    meta: { title: 'Editor de Quiz — MANTIS' }
-  },
-  {
-    path: '/host',
-    name: 'host',
-    component: HostView,
-    meta: { title: 'Host — MANTIS' }
-  },
-  {
-    path: '/join',
-    name: 'join',
-    component: JoinView,
-    meta: { title: 'Unirse — MANTIS' }
-  },
-  {
-    path: '/play',
-    name: 'play',
-    component: PlayView,
-    meta: { title: 'Jugar — MANTIS' }
-  },
-  {
-    path: '/results',
-    name: 'results',
-    component: ResultsView,
-    meta: { title: 'Resultados — MANTIS' }
-  },
-  // Redirigir rutas desconocidas al home
-  {
-    path: '/:pathMatch(.*)*',
-    redirect: '/'
-  }
+  { path: '/', name: 'home', component: HomeView },
+  { path: '/dashboard', name: 'dashboard', component: DashboardView, meta: { title: 'Dashboard — QuizHive' } },
+  { path: '/admin', name: 'admin', component: AdminView, meta: { title: 'Editor de Quiz — QuizHive' } },
+  { path: '/host', name: 'host', component: HostView, meta: { title: 'Host — QuizHive' } },
+  { path: '/join', name: 'join', component: JoinView, meta: { title: 'Unirse — QuizHive' } },
+  { path: '/play', name: 'play', component: PlayView, meta: { title: 'Jugar — QuizHive' } },
+  { path: '/results', name: 'results', component: ResultsView, meta: { title: 'Resultados — QuizHive' } },
+  { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 
 const router = createRouter({
@@ -67,9 +26,8 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 })
 })
 
-// Actualizar <title> de la página
 router.afterEach((to) => {
-  document.title = to.meta.title || 'MANTIS'
+  document.title = to.meta.title || 'QuizHive'
 })
 
 export default router
