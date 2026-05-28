@@ -3,7 +3,9 @@
     <header class="admin-header">
       <div class="header-inner">
         <router-link to="/dashboard" class="back-link">← Dashboard</router-link>
-        <span class="logo">🐝 QuizHive</span>
+        <span class="logo">
+          <img src="/img/quizhive.png" width="120" alt="QuizHive Logo">
+        </span>
         <h1>Editor de Quiz</h1>
       </div>
     </header>

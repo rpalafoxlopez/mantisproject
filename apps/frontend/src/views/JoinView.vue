@@ -2,7 +2,7 @@
   <div class="join-view">
     <header class="join-header">
       <router-link to="/" class="back-link">← Inicio</router-link>
-      <span class="logo">🐝 QuizHive</span>
+       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
     </header>
 
     <main class="join-main">

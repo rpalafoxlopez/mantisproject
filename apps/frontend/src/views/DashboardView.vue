@@ -2,8 +2,7 @@
   <div class="dashboard">
     <aside class="sidebar">
       <div class="sidebar-logo">
-        <span class="logo-icon">🐝</span>
-        <span class="logo-text">QuizHive</span>
+        <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
       </div>
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item active">

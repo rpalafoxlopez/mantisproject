@@ -71,6 +71,6 @@ setupGameSocket(io);
 
 const PORT = process.env.PORT || 10000;
 httpServer.listen(PORT, () => {
-  console.log(`🐝 QuizHive API running on port ${PORT}`);
-  console.log(`🐝 Allowed origins: ${allowedOrigins.join(', ')}`);
+  console.log(`QuizHive API running on port ${PORT}`);
+  console.log(`Allowed origins: ${allowedOrigins.join(', ')}`);
 });

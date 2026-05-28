@@ -1,8 +1,7 @@
 <template>
   <div class="play-view">
     <header class="play-header">
-      <span class="logo">🐝 QuizHive</span>
-      <span class="player-name">{{ playerName }}</span>
+       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
     </header>
 
     <main class="play-main">

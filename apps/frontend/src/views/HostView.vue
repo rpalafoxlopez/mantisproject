@@ -2,7 +2,7 @@
   <div class="host-view">
     <header class="host-header">
       <router-link to="/dashboard" class="back-link">← Dashboard</router-link>
-      <span class="logo">🐝 QuizHive</span>
+      <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
     </header>
 
     <main class="host-main">

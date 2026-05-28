@@ -1,17 +1,17 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-background px-4">
+  <div class="flex items-center justify-center min-h-screen px-4 bg-background">
     <div class="w-full max-w-md">
       <!-- Logo -->
-      <div class="text-center mb-8">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-xl bg-secondary/10 text-secondary mb-4">
-          <span class="material-symbols-outlined text-3xl" style="font-variation-settings: 'FILL' 1;">hive</span>
+      <div class="mb-8 text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 mb-4 rounded-xl bg-secondary/10 text-secondary">
+          <span class="text-3xl material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">hive</span>
         </div>
         <h1 class="text-2xl font-bold text-primary">Welcome back to QuizHive</h1>
-        <p class="text-on-surface-variant mt-2">Sign in to your account to continue</p>
+        <p class="mt-2 text-on-surface-variant">Sign in to your account to continue</p>
       </div>
 
       <!-- Form Card -->
-      <div class="card p-8">
+      <div class="p-8 card">
         <form @submit.prevent="handleLogin">
           <div class="space-y-5">
             <div>
@@ -42,7 +42,7 @@
 
             <button 
               type="submit"
-              class="btn btn-primary w-full"
+              class="w-full btn btn-primary"
               :disabled="authStore.loading"
             >
               <span v-if="authStore.loading" class="spinner"></span>
@@ -54,7 +54,7 @@
         <div class="mt-6 text-center">
           <p class="text-sm text-on-surface-variant">
             Don't have an account? 
-            <router-link to="/register" class="text-secondary font-semibold hover:underline">
+            <router-link to="/register" class="font-semibold text-secondary hover:underline">
               Get Started
             </router-link>
           </p>
@@ -80,7 +80,7 @@ const form = reactive({
 async function handleLogin() {
   const result = await authStore.login(form.email, form.password)
   if (result.success) {
-    router.push('/')
+    router.push('/dashboard')
   }
 }
 </script>
