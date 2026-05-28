@@ -21,6 +21,14 @@
             Home
           </router-link>
           <router-link 
+            v-if="authStore.isAuthenticated"
+            to="/dashboard" 
+            class="transition-colors text-label-md font-label-md"
+            :class="$route.path === '/dashboard' ? 'text-secondary font-bold border-b-2 border-secondary pb-1' : 'text-on-surface-variant hover:text-secondary'"
+          >
+            Dashboard
+          </router-link>
+          <router-link 
             v-if="authStore.isAdmin"
             to="/admin" 
             class="transition-colors text-label-md font-label-md"
@@ -78,7 +86,7 @@ import { useAuthStore } from './stores/auth.js'
 const route = useRoute()
 const authStore = useAuthStore()
 
-const showNav = computed(() => !['Play', 'Host'].includes(route.name))
+const showNav = computed(() => !route.meta.hideNav)
 
 onMounted(() => {
   authStore.fetchUser()
@@ -89,23 +97,10 @@ onMounted(() => {
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', sans-serif; background-color: #f7f9fb; color: #1b2e51; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
 
-body {
-  font-family: 'Inter', sans-serif;
-  background-color: #f7f9fb;
-  color: #1b2e51;
-}
-
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-}
-
-/* Tailwind-like utility classes */
 .bg-background { background-color: #f5f6ff; }
 .bg-surface-white { background-color: #ffffff; }
 .text-primary { color: #005ea1; }
@@ -118,101 +113,20 @@ body {
 .bg-primary { background-color: #005ea1; }
 .hover\:bg-secondary:hover { background-color: #0e59b6; }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  text-decoration: none;
-}
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 0.5rem; font-weight: 600; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; border: none; text-decoration: none; }
+.btn-primary { background: linear-gradient(135deg, #005ea1, #0e59b6); color: white; }
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0, 94, 161, 0.3); }
+.btn-secondary { background: white; color: #005ea1; border: 2px solid #005ea1; }
+.btn-secondary:hover { background: #005ea1; color: white; }
+.btn-danger { background: linear-gradient(135deg, #b31b25, #fb5151); color: white; }
+.btn-success { background: linear-gradient(135deg, #2F855A, #48bb78); color: white; }
 
-.btn-primary {
-  background: linear-gradient(135deg, #005ea1, #0e59b6);
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 94, 161, 0.3);
-}
-
-.btn-secondary {
-  background: white;
-  color: #005ea1;
-  border: 2px solid #005ea1;
-}
-
-.btn-secondary:hover {
-  background: #005ea1;
-  color: white;
-}
-
-.btn-danger {
-  background: linear-gradient(135deg, #b31b25, #fb5151);
-  color: white;
-}
-
-.btn-success {
-  background: linear-gradient(135deg, #2F855A, #48bb78);
-  color: white;
-}
-
-.card {
-  background: white;
-  border-radius: 0.75rem;
-  padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid #E2E8F0;
-}
-
-.input {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1px solid #E2E8F0;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-family: inherit;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  background: white;
-}
-
-.input:focus {
-  outline: none;
-  border-color: #005ea1;
-  box-shadow: 0 0 0 3px rgba(0, 94, 161, 0.1);
-}
-
-.error-text {
-  color: #b31b25;
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-top: 0.5rem;
-}
-
-.spinner {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255,255,255,0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.3s;
-}
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
+.card { background: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 1px solid #E2E8F0; }
+.input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #E2E8F0; border-radius: 0.5rem; font-size: 0.875rem; font-family: inherit; transition: border-color 0.2s, box-shadow 0.2s; background: white; }
+.input:focus { outline: none; border-color: #005ea1; box-shadow: 0 0 0 3px rgba(0, 94, 161, 0.1); }
+.error-text { color: #b31b25; font-size: 0.875rem; font-weight: 500; margin-top: 0.5rem; }
+.spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
