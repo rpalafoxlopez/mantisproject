@@ -1,8 +1,9 @@
-<template>
+<<template>
   <div class="host-container">
     <header class="host-header">
       <div class="logo-section">
-        <img src="/img/quizhive.png" alt="MANTIS" class="host-logo" />
+        <img src="/img/quizhive.png" alt="QuizHive" class="host-logo" />
+        <span class="logo-text">QuizHive</span>
       </div>
       <div class="header-actions">
         <button class="btn-exit" @click="exitGame">
@@ -11,7 +12,7 @@
       </div>
     </header>
 
-    <!-- LOBBY / DASHBOARD DEL HOST -->
+    <!-- DASHBOARD DEL HOST -->
     <div v-if="!showFinalResults" class="lobby-view">
       <div class="lobby-card">
         <div class="session-info">
@@ -314,7 +315,6 @@ function shareTelegram() {
 .logo-text { font-size: 1.25rem; font-weight: 800; background: linear-gradient(135deg, #00d4aa, #00a8e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
 .btn-exit { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; padding: 0.5rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
 .btn-exit:hover { background: rgba(255,50,50,0.2); border-color: rgba(255,50,50,0.4); color: #ff4444; }
-
 .lobby-view { max-width: 900px; margin: 0 auto; padding: 2rem; }
 .lobby-card { display: flex; flex-direction: column; gap: 2rem; }
 .session-info { text-align: center; }
