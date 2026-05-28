@@ -21,6 +21,22 @@ const QuestionSchema = new mongoose.Schema({
   timeLimit: { type: Number, default: 20, min: 5, max: 120 }
 });
 
+const PlayerAnswerSchema = new mongoose.Schema({
+  questionIndex: { type: Number, required: true },
+  answerIndex: { type: Number, required: true },
+  isCorrect: { type: Boolean, required: true },
+  timeUsed: { type: Number, default: 0 },
+  pts: { type: Number, default: 0 },
+  answeredAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+const PlayerSchema = new mongoose.Schema({
+  socketId: { type: String, required: true },
+  name: { type: String, required: true, trim: true },
+  score: { type: Number, default: 0 },
+  answers: { type: [PlayerAnswerSchema], default: [] }
+}, { _id: false });
+
 const SessionSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true, trim: true },
   title: { type: String, required: true, trim: true, maxlength: 100 },
@@ -29,9 +45,8 @@ const SessionSchema = new mongoose.Schema({
     default: [],
     validate: { validator: qs => qs.length <= 100, message: 'Una partida puede tener como máximo 100 preguntas.' }
   },
-  status: { type: String, enum: ['waiting', 'active', 'finished'], default: 'waiting' },
-  currentQuestion: { type: Number, default: 0 },
-  players: [{ socketId: String, name: String, score: { type: Number, default: 0 } }],
+  status: { type: String, enum: ['active', 'finished'], default: 'active' },
+  players: { type: [PlayerSchema], default: [] },
   createdAt: { type: Date, default: Date.now, expires: 86400 }
 });
 

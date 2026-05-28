@@ -2,95 +2,261 @@ import Session from '../models/Session.js';
 import { calculateScore } from '../utils/helpers.js';
 
 export function setupGameSocket(io) {
-  const answers = new Map();
-
   io.on('connection', (socket) => {
+    console.log('🔌 Cliente conectado:', socket.id);
 
+    // ========== HOST ==========
     socket.on('host:join', async ({ code }) => {
       try {
         const session = await Session.findOne({ code: code.toUpperCase() });
         if (!session) return socket.emit('error', { message: 'Sesión no encontrada.' });
         if (!session.questions.length) return socket.emit('error', { message: 'La partida no tiene preguntas.' });
-        socket.join(code); socket.data.role = 'host'; socket.data.code = code;
-        socket.emit('host:joined', { code, title: session.title, questionCount: session.questions.length, players: session.players });
-      } catch (err) { socket.emit('error', { message: err.message }); }
-    });
 
-    socket.on('host:start', async ({ code }) => {
-      try {
-        const session = await Session.findOne({ code: code.toUpperCase() });
-        if (!session) return;
-        session.status = 'active'; session.currentQuestion = 0; await session.save();
-        io.to(code).emit('game:started', { questionCount: session.questions.length });
-        sendQuestion(io, session, answers);
-      } catch (err) { socket.emit('error', { message: err.message }); }
-    });
+        socket.join(code);
+        socket.data.role = 'host';
+        socket.data.code = code;
 
-    socket.on('host:next', async ({ code }) => {
-      try {
-        const session = await Session.findOne({ code: code.toUpperCase() });
-        if (!session) return;
-        session.currentQuestion += 1;
-        if (session.currentQuestion >= session.questions.length) {
-          session.status = 'finished'; await session.save();
-          io.to(code).emit('game:ended', { leaderboard: session.players.sort((a, b) => b.score - a.score) }); return;
-        }
-        await session.save(); sendQuestion(io, session, answers);
-      } catch (err) { socket.emit('error', { message: err.message }); }
+        socket.emit('host:joined', {
+          code,
+          title: session.title,
+          questionCount: session.questions.length,
+          players: session.players
+        });
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
     });
 
     socket.on('host:end', async ({ code }) => {
       try {
-        const session = await Session.findOneAndUpdate({ code: code.toUpperCase() }, { status: 'finished' }, { new: true });
-        if (session) io.to(code).emit('game:ended', { leaderboard: session.players.sort((a, b) => b.score - a.score) });
-      } catch (err) { socket.emit('error', { message: err.message }); }
+        const session = await Session.findOneAndUpdate(
+          { code: code.toUpperCase() },
+          { status: 'finished' },
+          { new: true }
+        );
+        if (!session) return;
+
+        const leaderboard = session.players
+          .map(p => ({
+            name: p.name,
+            score: p.score,
+            correctCount: p.answers.filter(a => a.isCorrect).length,
+            totalAnswered: p.answers.length
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10);
+
+        io.to(code).emit('quiz:finalResults', {
+          title: session.title,
+          leaderboard,
+          totalQuestions: session.questions.length,
+          totalPlayers: session.players.length
+        });
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
     });
 
+    // ========== PLAYER ==========
     socket.on('player:join', async ({ code, name }) => {
       try {
-        const session = await Session.findOne({ code: code.toUpperCase() });
-        if (!session) return socket.emit('error', { message: 'Código de partida inválido.' });
-        if (session.status === 'finished') return socket.emit('error', { message: 'Esta partida ya terminó.' });
-        if (session.players.some(p => p.name === name)) return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
-        session.players.push({ socketId: socket.id, name, score: 0 }); await session.save();
-        socket.join(code); socket.data.role = 'player'; socket.data.code = code; socket.data.name = name;
-        socket.emit('player:joined', { name, code, title: session.title });
-        io.to(code).emit('players:update', { players: session.players });
-      } catch (err) { socket.emit('error', { message: err.message }); }
-    });
+        const cleanCode = code.toUpperCase().trim();
+        const cleanName = name.trim();
 
-    socket.on('player:answer', async ({ code, answerIndex, timeUsed }) => {
-      try {
-        const session = await Session.findOne({ code: code.toUpperCase() });
-        if (!session || session.status !== 'active') return;
-        const q = session.questions[session.currentQuestion]; if (!q) return;
-        if (!answers.has(code)) answers.set(code, new Map());
-        const roomAnswers = answers.get(code); if (roomAnswers.has(socket.id)) return;
-        const isCorrect = q.options[answerIndex]?.isCorrect === true;
-        const pts = isCorrect ? calculateScore(q.timeLimit, timeUsed) : 0;
-        roomAnswers.set(socket.id, { answerIndex, timeUsed, isCorrect, pts });
-        const player = session.players.find(p => p.socketId === socket.id);
-        if (player) { player.score += pts; await session.save(); }
-        socket.emit('answer:result', { isCorrect, points: pts, correctIndex: q.options.findIndex(o => o.isCorrect) });
-        const activePlayers = session.players.filter(p => io.sockets.sockets.get(p.socketId));
-        if (roomAnswers.size >= activePlayers.length) {
-          io.to(code).emit('question:results', { correctIndex: q.options.findIndex(o => o.isCorrect), leaderboard: session.players.sort((a, b) => b.score - a.score).slice(0, 5) });
+        if (!cleanName || cleanName.length < 1) {
+          return socket.emit('error', { message: 'El nombre no puede estar vacío.' });
         }
-      } catch (err) { socket.emit('error', { message: err.message }); }
+
+        const session = await Session.findOne({ code: cleanCode });
+        if (!session) {
+          return socket.emit('error', { message: 'Código de partida inválido.' });
+        }
+        if (session.status === 'finished') {
+          return socket.emit('error', { message: 'Este quiz ya terminó.' });
+        }
+
+        // 🧹 Limpiar players con sockets muertos
+        const connectedSocketIds = Array.from(io.sockets.sockets.keys());
+        const originalCount = session.players.length;
+        session.players = session.players.filter(p => {
+          const isAlive = connectedSocketIds.includes(p.socketId);
+          if (!isAlive) console.log(`🧹 Zombie eliminado: ${p.name} (${p.socketId})`);
+          return isAlive;
+        });
+        if (session.players.length < originalCount) {
+          console.log(`🧹 Limpiados ${originalCount - session.players.length} zombies`);
+        }
+
+        // 🔄 Manejar reconexión
+        const existingIndex = session.players.findIndex(p => p.name === cleanName);
+        if (existingIndex !== -1) {
+          const existing = session.players[existingIndex];
+          const oldSocket = io.sockets.sockets.get(existing.socketId);
+          if (oldSocket && oldSocket.connected) {
+            console.log(`🚫 Rechazado: ${cleanName} ya está conectado`);
+            return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
+          }
+          console.log(`🔄 Reconectando: ${cleanName} (${existing.socketId} → ${socket.id})`);
+          session.players[existingIndex].socketId = socket.id;
+        } else {
+          console.log(`✅ Nuevo player: ${cleanName} en ${cleanCode}`);
+          session.players.push({
+            socketId: socket.id,
+            name: cleanName,
+            score: 0,
+            answers: []
+          });
+        }
+
+        await session.save();
+
+        socket.join(cleanCode);
+        socket.data.role = 'player';
+        socket.data.code = cleanCode;
+        socket.data.name = cleanName;
+
+        // Enviar todas las preguntas al jugador
+        socket.emit('player:joined', {
+          name: cleanName,
+          code: cleanCode,
+          title: session.title,
+          questions: session.questions.map(q => ({
+            text: q.text,
+            options: q.options.map(o => ({ text: o.text })),
+            timeLimit: q.timeLimit
+          })),
+          totalQuestions: session.questions.length
+        });
+
+        // Notificar a host del cambio
+        io.to(cleanCode).emit('players:update', {
+          players: session.players.map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+        });
+
+      } catch (err) {
+        console.error('❌ player:join error:', err);
+        socket.emit('error', { message: 'Error al unirse a la partida.' });
+      }
     });
 
-    socket.on('disconnect', async () => {
-      if (!socket.data.code) return;
+    socket.on('player:answer', async ({ code, questionIndex, answerIndex, timeUsed }) => {
       try {
-        await Session.updateOne({ code: socket.data.code }, { $pull: { players: { socketId: socket.id } } });
-        io.to(socket.data.code).emit('players:update', { players: (await Session.findOne({ code: socket.data.code }))?.players || [] });
-      } catch { /* silent */ }
+        const cleanCode = code.toUpperCase();
+        const session = await Session.findOne({ code: cleanCode });
+        if (!session || session.status !== 'active') return;
+
+        const question = session.questions[questionIndex];
+        if (!question) return;
+
+        const player = session.players.find(p => p.socketId === socket.id);
+        if (!player) return;
+
+        // Verificar si ya respondió esta pregunta
+        const alreadyAnswered = player.answers.find(a => a.questionIndex === questionIndex);
+        if (alreadyAnswered) {
+          return socket.emit('error', { message: 'Ya respondiste esta pregunta.' });
+        }
+
+        const isCorrect = question.options[answerIndex]?.isCorrect === true;
+        const pts = isCorrect ? calculateScore(question.timeLimit, timeUsed || question.timeLimit) : 0;
+
+        player.answers.push({
+          questionIndex,
+          answerIndex,
+          isCorrect,
+          timeUsed: timeUsed || 0,
+          pts,
+          answeredAt: new Date()
+        });
+
+        player.score += pts;
+        await session.save();
+
+        socket.emit('answer:confirmed', {
+          questionIndex,
+          isCorrect,
+          points: pts,
+          yourScore: player.score,
+          correctIndex: question.options.findIndex(o => o.isCorrect)
+        });
+
+        // Actualizar progreso en host
+        io.to(cleanCode).emit('players:update', {
+          players: session.players
+            .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+            .sort((a, b) => b.score - a.score)
+        });
+
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    socket.on('player:requestResults', async ({ code }) => {
+      try {
+        const session = await Session.findOne({ code: code.toUpperCase() });
+        if (!session) return;
+
+        const player = session.players.find(p => p.socketId === socket.id);
+        if (!player) return;
+
+        const leaderboard = session.players
+          .map(p => ({
+            name: p.name,
+            score: p.score,
+            correctCount: p.answers.filter(a => a.isCorrect).length,
+            totalAnswered: p.answers.length
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 10);
+
+        const playerRank = session.players
+          .sort((a, b) => b.score - a.score)
+          .findIndex(p => p.socketId === socket.id) + 1;
+
+        socket.emit('quiz:personalResults', {
+          yourScore: player.score,
+          yourRank: playerRank,
+          totalPlayers: session.players.length,
+          correctCount: player.answers.filter(a => a.isCorrect).length,
+          totalQuestions: session.questions.length,
+          leaderboard,
+          answers: player.answers
+        });
+
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
+    // ========== DISCONNECT ==========
+    socket.on('disconnect', async (reason) => {
+      console.log('🔌 Desconectado:', socket.id, 'Razón:', reason);
+      if (!socket.data.code) return;
+
+      setTimeout(async () => {
+        try {
+          const reconnected = io.sockets.sockets.get(socket.id);
+          if (reconnected) {
+            console.log(`🔄 ${socket.data.name} se reconectó, no eliminar`);
+            return;
+          }
+
+          await Session.updateOne(
+            { code: socket.data.code },
+            { $pull: { players: { socketId: socket.id } } }
+          );
+
+          const updated = await Session.findOne({ code: socket.data.code });
+          io.to(socket.data.code).emit('players:update', {
+            players: updated?.players.map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length })) || []
+          });
+
+          console.log(`🗑️ Eliminado tras grace period: ${socket.data.name || socket.id}`);
+        } catch (err) {
+          console.error('❌ disconnect cleanup error:', err);
+        }
+      }, 5000);
     });
   });
-}
-
-async function sendQuestion(io, session, answers) {
-  const code = session.code; const q = session.questions[session.currentQuestion];
-  answers.set(code, new Map());
-  io.to(code).emit('question:show', { index: session.currentQuestion, total: session.questions.length, text: q.text, options: q.options.map(o => ({ text: o.text })), timeLimit: q.timeLimit });
 }

@@ -1,26 +1,26 @@
-<template>
+<<template>
   <div class="join-view">
     <header class="join-header">
       <router-link to="/" class="back-link">← Inicio</router-link>
-       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
+      <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
     </header>
 
     <main class="join-main">
       <section class="card join-card">
-        <h2>🎮 Unirse a una partida</h2>
-        <p class="subtitle">Ingresa el código de la partida y tu nombre para comenzar.</p>
+        <h2>🎮 Unirse a un Quiz</h2>
+        <p class="subtitle">Ingresa el código y tu nombre para comenzar.</p>
 
         <div class="field">
-          <label>Código de la partida</label>
+          <label>Código del quiz</label>
           <input v-model="code" type="text" placeholder="Ej. ABC123" maxlength="6" @keyup.enter="focusName" />
         </div>
 
         <div class="field">
           <label>Tu nombre</label>
-          <input ref="nameInput" v-model="name" type="text" placeholder="Ej. Juanito" maxlength="20" @keyup.enter="joinGame" />
+          <input ref="nameInput" v-model="name" type="text" placeholder="Ej. Juanito" maxlength="20" @keyup.enter="joinQuiz" />
         </div>
 
-        <button class="btn-primary btn-large" :disabled="joining || !code.trim() || !name.trim()" @click="joinGame">
+        <button class="btn-primary btn-large" :disabled="joining || !code.trim() || !name.trim()" @click="joinQuiz">
           <span v-if="joining">Uniendo…</span><span v-else>🚀 ¡Vamos!</span>
         </button>
 
@@ -31,7 +31,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 
@@ -45,26 +45,79 @@ const joining = ref(false)
 const error = ref('')
 const nameInput = ref(null)
 
+let socket = null
+
 onMounted(() => {
   const codeFromUrl = route.query.code
   if (codeFromUrl) code.value = codeFromUrl.toUpperCase()
 })
 
+onUnmounted(() => {
+  if (socket) {
+    socket.off('player:joined')
+    socket.off('error')
+    socket.off('connect_error')
+  }
+})
+
 function focusName() { nameInput.value?.focus() }
 
-function joinGame() {
+function joinQuiz() {
   if (!code.value.trim() || !name.value.trim() || joining.value) return
-  joining.value = true; error.value = ''
-  const socket = io(API)
-  socket.emit('player:join', { code: code.value.trim(), name: name.value.trim() })
+  
+  joining.value = true
+  error.value = ''
 
-  socket.on('player:joined', ({ code: c, title }) => {
+  if (!socket || !socket.connected) {
+    socket = io(API, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000
+    })
+  }
+
+  socket.off('player:joined')
+  socket.off('error')
+  socket.off('connect_error')
+
+  socket.once('player:joined', ({ code: c, title, questions, totalQuestions }) => {
+    console.log('✅ Unido al quiz:', title)
+    
     localStorage.setItem('quizhive_player_code', c)
     localStorage.setItem('quizhive_player_name', name.value.trim())
-    router.push(`/play?code=${c}&name=${encodeURIComponent(name.value.trim())}`)
+    
+    // Redirigir a /play con todas las preguntas
+    router.push({
+      path: '/play',
+      query: {
+        code: c,
+        name: encodeURIComponent(name.value.trim())
+      }
+    })
   })
 
-  socket.on('error', ({ message }) => { error.value = message; joining.value = false })
+  socket.once('error', ({ message }) => {
+    error.value = message
+    joining.value = false
+  })
+
+  socket.once('connect_error', () => {
+    error.value = 'Error de conexión. Intenta de nuevo.'
+    joining.value = false
+  })
+
+  setTimeout(() => {
+    if (joining.value) {
+      error.value = 'El servidor no respondió.'
+      joining.value = false
+    }
+  }, 8000)
+
+  socket.emit('player:join', {
+    code: code.value.trim(),
+    name: name.value.trim()
+  })
 }
 </script>
 
