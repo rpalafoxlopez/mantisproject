@@ -1,556 +1,364 @@
 <template>
-  <div class="admin-container">
+  <div class="admin-view">
     <header class="admin-header">
-      <div class="logo-section">
-        <img src="/img/logo.png" alt="MANTIS" class="admin-logo" />
-        <span class="logo-text">MANTIS</span>
-      </div>
-      <div class="header-actions">
-        <span class="user-badge">{{ authStore.user?.name || 'Admin' }}</span>
-        <button class="btn-logout" @click="authStore.logout">
-          <span class="material-icons">logout</span>
-        </button>
+      <div class="header-inner">
+        <router-link to="/dashboard" class="back-link">← Dashboard</router-link>
+        <span class="logo">
+          <img src="/img/quizhive.png" width="120" alt="QuizHive Logo">
+        </span>
+        <h1>Editor de Quiz</h1>
       </div>
     </header>
 
     <main class="admin-main">
-      <section v-if="step === 1" class="step-section">
-        <div class="step-header">
-          <div class="step-badge">1</div>
-          <h2>Crear Nueva Partida</h2>
-          <p class="step-desc">Configura los detalles basicos de tu partida</p>
+      <section v-if="!currentSession" class="card create-card">
+        <h2>Nueva Partida</h2>
+        <p class="subtitle">Crea una partida, escribe tus preguntas y comparte el código con los jugadores.</p>
+        <div class="field">
+          <label>Título de la partida</label>
+          <input v-model="newTitle" type="text" placeholder="Ej. Quiz de Historia, Trivia del equipo…" maxlength="100" @keyup.enter="createSession" />
         </div>
-        <div class="form-card">
-          <div class="form-group">
-            <label for="sessionTitle">Titulo de la Partida</label>
-            <input id="sessionTitle" v-model="sessionTitle" type="text"
-              placeholder="Ej: Evaluacion de Pensamiento Critico - Grupo A" maxlength="100" />
-          </div>
-          <div class="form-group">
-            <label>Configuracion de Tiempo</label>
-            <div class="settings-row">
-              <div class="setting-item">
-                <span class="setting-label">Tiempo por pregunta</span>
-                <div class="time-selector">
-                  <button @click="timePerQuestion = Math.max(5, timePerQuestion - 5)">-</button>
-                  <span class="time-value">{{ timePerQuestion }}s</span>
-                  <button @click="timePerQuestion = Math.min(120, timePerQuestion + 5)">+</button>
-                </div>
-              </div>
-              <div class="setting-item">
-                <label class="toggle-label">
-                  <input type="checkbox" v-model="showLeaderboard" />
-                  <span class="toggle-slider"></span>
-                  <span class="toggle-text">Mostrar leaderboard entre preguntas</span>
-                </label>
-              </div>
-            </div>
-          </div>
-          <div class="form-actions">
-            <button class="btn-primary btn-large" @click="goToStep2" :disabled="!sessionTitle.trim()">
-              <span class="material-icons">arrow_forward</span>
-              Siguiente: Agregar Preguntas
-            </button>
+        <button class="btn-primary" :disabled="creating || !newTitle.trim()" @click="createSession">
+          <span v-if="creating">Creando…</span><span v-else>🚀 Crear Partida</span>
+        </button>
+        <p v-if="createError" class="error-msg">{{ createError }}</p>
+
+        <div v-if="activeSessions.length" class="prev-sessions">
+          <h3>Partidas activas</h3>
+          <div v-for="s in activeSessions" :key="s.code" class="prev-item" @click="loadSession(s.code)">
+            <span class="prev-title">{{ s.title }}</span>
+            <span class="prev-code">{{ s.code }}</span>
+            <span class="prev-count">{{ s.questions.length }} preg.</span>
           </div>
         </div>
       </section>
 
-      <section v-if="step === 2" class="step-section">
-        <div class="step-header">
-          <div class="step-badge">2</div>
-          <h2>Agregar Preguntas</h2>
-          <p class="step-desc">
-            <span class="badge badge-info">Solo Opcion Multiple</span>
-            Cada pregunta debe tener entre 2 y 6 opciones y una respuesta correcta.
-          </p>
-        </div>
-        <div class="questions-container">
-          <div v-for="(q, index) in questions" :key="q.id" class="question-card"
-            :class="{ 'has-error': q.errors.length > 0 }">
-            <div class="question-header">
-              <span class="question-number">Pregunta {{ index + 1 }}</span>
+      <template v-else>
+        <section class="card code-card">
+          <div class="code-top">
+            <div><h2>{{ currentSession.title }}</h2><p class="subtitle">Comparte este código con los jugadores</p></div>
+            <button class="btn-ghost" @click="exitSession">← Salir</button>
+          </div>
+          <div class="code-display">
+            <span class="room-code">{{ currentSession.code }}</span>
+            <button class="btn-copy" @click="copyCode" :class="{ copied: codeCopied }">{{ codeCopied ? '✅ Copiado' : '📋 Copiar' }}</button>
+          </div>
+          <div class="share-row">
+            <input class="share-input" readonly :value="shareUrl" />
+            <button class="btn-share" @click="shareLink">🔗 Compartir enlace</button>
+          </div>
+          <div class="session-meta">
+            <span class="badge badge-active" v-if="currentSession.status === 'active'">Activo</span>
+            <span class="badge badge-finished" v-if="currentSession.status === 'finished'">Terminado</span>
+            <span>{{ currentSession.questions.length }} preguntas</span>
+            <button class="btn-danger-sm" @click="deleteSession">🗑 Eliminar partida</button>
+          </div>
+        </section>
+
+        <section class="card questions-card">
+          <div class="questions-header">
+            <h2>Preguntas</h2>
+            <button class="btn-primary" @click="openQuestionForm(null)">+ Agregar pregunta</button>
+          </div>
+          <div v-if="!currentSession.questions.length" class="empty-state"><p>Aún no hay preguntas. ¡Agrega la primera!</p></div>
+          <TransitionGroup name="qlist" tag="div" class="question-list">
+            <div v-for="(q, idx) in currentSession.questions" :key="idx" class="question-item">
+              <div class="question-num">{{ idx + 1 }}</div>
+              <div class="question-body">
+                <p class="question-text">{{ q.text }}</p>
+                <div class="options-preview">
+                  <span v-for="(opt, oi) in q.options" :key="oi" class="opt-chip" :class="{ correct: opt.isCorrect }">{{ opt.text }}</span>
+                </div>
+                <span class="time-label">⏱ {{ q.timeLimit }}s</span>
+              </div>
               <div class="question-actions">
-                <button class="btn-icon" @click="moveQuestion(index, -1)" :disabled="index === 0">
-                  <span class="material-icons">arrow_upward</span>
-                </button>
-                <button class="btn-icon" @click="moveQuestion(index, 1)" :disabled="index === questions.length - 1">
-                  <span class="material-icons">arrow_downward</span>
-                </button>
-                <button class="btn-icon btn-danger" @click="removeQuestion(index)">
-                  <span class="material-icons">delete</span>
-                </button>
+                <button class="btn-icon" title="Editar" @click="openQuestionForm(idx)">✏️</button>
+                <button class="btn-icon btn-del" title="Eliminar" @click="deleteQuestion(idx)">🗑</button>
               </div>
             </div>
-            <div class="form-group">
-              <label>Texto de la Pregunta <span class="required">*</span></label>
-              <textarea v-model="q.question" rows="2" placeholder="Escribe tu pregunta aqui..."
-                @blur="validateQuestion(index)"></textarea>
-            </div>
-            <div class="options-section">
-              <label>Opciones de Respuesta <span class="required">*</span>
-                <span class="hint">(Minimo 2, Maximo 6)</span>
-              </label>
-              <div class="options-list">
-                <div v-for="(opt, optIndex) in q.options" :key="optIndex" class="option-row"
-                  :class="{ 'correct-option': q.correctAnswer === optIndex }">
-                  <span class="option-letter">{{ ['A','B','C','D','E','F'][optIndex] }}</span>
-                  <input v-model="q.options[optIndex]" type="text"
-                    :placeholder="'Opcion ' + ['A','B','C','D','E','F'][optIndex]"
-                    @blur="validateQuestion(index)" />
-                  <label class="correct-radio" title="Marcar como correcta">
-                    <input type="radio" :name="'correct-' + q.id" :value="optIndex"
-                      v-model="q.correctAnswer" @change="validateQuestion(index)" />
-                    <span class="radio-indicator">
-                      <span class="material-icons">check_circle</span>
-                    </span>
-                  </label>
-                  <button v-if="q.options.length > 2" class="btn-icon btn-sm btn-danger"
-                    @click="removeOption(index, optIndex)">
-                    <span class="material-icons">close</span>
-                  </button>
-                </div>
-              </div>
-              <button v-if="q.options.length < 6" class="btn-add-option" @click="addOption(index)">
-                <span class="material-icons">add_circle</span> Agregar Opcion
-              </button>
-            </div>
-            <div class="question-settings">
-              <div class="setting-field">
-                <label>Tiempo (s)</label>
-                <input v-model.number="q.timeLimit" type="number" min="5" max="120" />
-              </div>
-              <div class="setting-field">
-                <label>Puntos</label>
-                <input v-model.number="q.points" type="number" min="10" max="1000" step="10" />
-              </div>
-              <div class="setting-field">
-                <label>Dificultad</label>
-                <select v-model="q.difficulty">
-                  <option value="easy">Facil</option>
-                  <option value="medium">Media</option>
-                  <option value="hard">Dificil</option>
-                </select>
-              </div>
-            </div>
-            <div v-if="q.errors.length > 0" class="errors-box">
-              <span class="material-icons">error</span>
-              <ul><li v-for="err in q.errors" :key="err">{{ err }}</li></ul>
-            </div>
-          </div>
-          <button class="btn-add-question" @click="addQuestion" :disabled="questions.length >= 25">
-            <span class="material-icons">add</span>
-            <span>Agregar Pregunta</span>
-            <span class="count">({{ questions.length }}/25)</span>
-          </button>
-        </div>
-        <div class="form-actions step-nav">
-          <button class="btn-secondary" @click="step = 1">
-            <span class="material-icons">arrow_back</span> Atras
-          </button>
-          <button class="btn-primary btn-large" @click="goToStep3" :disabled="!isQuestionsValid">
-            <span class="material-icons">arrow_forward</span> Revisar y Crear Partida
-          </button>
-        </div>
-      </section>
-
-      <section v-if="step === 3" class="step-section">
-        <div class="step-header">
-          <div class="step-badge">3</div>
-          <h2>Revisar y Crear</h2>
-          <p class="step-desc">Verifica los detalles antes de crear la partida</p>
-        </div>
-        <div class="review-card">
-          <div class="review-section">
-            <h3>Detalles de la Partida</h3>
-            <div class="review-row">
-              <span class="review-label">Titulo:</span>
-              <span class="review-value">{{ sessionTitle }}</span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Preguntas:</span>
-              <span class="review-value">{{ questions.length }}</span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Tiempo por pregunta:</span>
-              <span class="review-value">{{ timePerQuestion }}s</span>
-            </div>
-            <div class="review-row">
-              <span class="review-label">Leaderboard:</span>
-              <span class="review-value">{{ showLeaderboard ? 'Si' : 'No' }}</span>
-            </div>
-          </div>
-          <div class="review-section">
-            <h3>Resumen de Preguntas</h3>
-            <div class="questions-summary">
-              <div v-for="(q, i) in questions" :key="i" class="summary-item">
-                <span class="summary-num">{{ i + 1 }}</span>
-                <span class="summary-text">{{ q.question }}</span>
-                <span class="summary-badge">{{ q.options.length }} opciones</span>
-                <span class="summary-correct">Correcta: {{ ['A','B','C','D','E','F'][q.correctAnswer] }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="form-actions step-nav">
-          <button class="btn-secondary" @click="step = 2">
-            <span class="material-icons">arrow_back</span> Editar Preguntas
-          </button>
-          <button class="btn-primary btn-large btn-create" @click="createSession" :disabled="isCreating">
-            <span v-if="isCreating" class="spinner"></span>
-            <span v-else class="material-icons">sports_esports</span>
-            {{ isCreating ? 'Creando...' : 'Crear Partida' }}
-          </button>
-        </div>
-      </section>
-
-      <section v-if="step === 4 && createdSession" class="step-section">
-        <div class="success-card">
-          <div class="success-icon">
-            <span class="material-icons">check_circle</span>
-          </div>
-          <h2>Partida Creada!</h2>
-          <p class="success-subtitle">Tu partida esta lista para comenzar</p>
-          <div class="code-section">
-            <label>Codigo de Sala</label>
-            <div class="code-display" @click="copyCode">
-              <span class="code-text">{{ createdSession.code }}</span>
-              <button class="btn-copy" :class="{ 'copied': copied }">
-                <span class="material-icons">{{ copied ? 'check' : 'content_copy' }}</span>
-              </button>
-            </div>
-            <span v-if="copied" class="copy-feedback">Copiado!</span>
-          </div>
-          <div class="share-section">
-            <h3>Compartir con los jugadores</h3>
-            <div class="share-buttons">
-              <button class="btn-share btn-whatsapp" @click="shareWhatsApp">
-                <img src="/img/whatsapp-icon.svg" alt="WA" class="share-icon" /> WhatsApp
-              </button>
-              <button class="btn-share btn-telegram" @click="shareTelegram">
-                <img src="/img/telegram-icon.svg" alt="TG" class="share-icon" /> Telegram
-              </button>
-              <button class="btn-share btn-email" @click="shareEmail">
-                <span class="material-icons">email</span> Email
-              </button>
-              <button class="btn-share btn-copy-link" @click="copyLink">
-                <span class="material-icons">link</span> Copiar Link
-              </button>
-            </div>
-          </div>
-          <div class="qr-section">
-            <p>O escanea el codigo QR para unirse:</p>
-            <div class="qr-placeholder">
-              <span class="material-icons">qr_code_2</span>
-              <span>QR: {{ createdSession.code }}</span>
-            </div>
-          </div>
-          <div class="success-actions">
-            <router-link :to="'/host/' + createdSession.code" class="btn-primary btn-large">
-              <span class="material-icons">play_arrow</span> Ir al Panel del Host
-            </router-link>
-            <button class="btn-secondary" @click="resetAndNew">
-              <span class="material-icons">add</span> Crear Otra Partida
-            </button>
-          </div>
-        </div>
-      </section>
+          </TransitionGroup>
+        </section>
+      </template>
     </main>
+
+    <Transition name="modal">
+      <div v-if="showForm" class="modal-overlay" @click.self="closeForm">
+        <div class="modal-card">
+          <h2>{{ editIndex === null ? 'Nueva Pregunta' : 'Editar Pregunta' }}</h2>
+          <div class="field">
+            <label>Pregunta *</label>
+            <textarea v-model="form.text" placeholder="Escribe la pregunta aquí…" rows="2" maxlength="500" />
+          </div>
+          <div class="field">
+            <label>Tiempo límite (segundos)</label>
+            <input v-model.number="form.timeLimit" type="number" min="5" max="120" />
+          </div>
+          <div class="options-section">
+            <div class="options-header-row"><label>Opciones de respuesta *</label><span class="options-hint">Selecciona cuál es la correcta</span></div>
+            <p class="options-rule">⚠️ Mínimo 2, máximo 6 opciones. Exactamente 1 correcta.</p>
+            <div v-for="(opt, i) in form.options" :key="i" class="option-row" :class="{ 'option-correct': opt.isCorrect }">
+              <button class="correct-toggle" :class="{ active: opt.isCorrect }" @click="setCorrect(i)" type="button" title="Marcar como correcta">{{ opt.isCorrect ? '✅' : '○' }}</button>
+              <input v-model="opt.text" type="text" :placeholder="`Opción ${i + 1}`" maxlength="200" class="option-input" />
+              <button v-if="form.options.length > 2" class="btn-icon btn-del" @click="removeOption(i)" type="button">×</button>
+            </div>
+            <button v-if="form.options.length < 6" class="btn-add-option" @click="addOption" type="button">+ Agregar opción</button>
+          </div>
+          <p v-if="formError" class="error-msg">{{ formError }}</p>
+          <div class="modal-actions">
+            <button class="btn-ghost" @click="closeForm">Cancelar</button>
+            <button class="btn-primary" :disabled="saving" @click="saveQuestion">{{ saving ? 'Guardando…' : (editIndex === null ? 'Agregar' : 'Guardar') }}</button>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth.js'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const route = useRoute()
 const router = useRouter()
-const authStore = useAuthStore()
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
-const step = ref(1)
-const isCreating = ref(false)
-const createdSession = ref(null)
-const copied = ref(false)
-const sessionTitle = ref('')
-const timePerQuestion = ref(20)
-const showLeaderboard = ref(true)
+const currentSession = ref(null)
+const activeSessions = ref([])
+const newTitle = ref('')
+const creating = ref(false)
+const createError = ref('')
+const codeCopied = ref(false)
+const showForm = ref(false)
+const editIndex = ref(null)
+const saving = ref(false)
+const formError = ref('')
+const form = ref(emptyForm())
 
-let questionIdCounter = 0
-function createEmptyQuestion() {
-  questionIdCounter++
-  return {
-    id: questionIdCounter, question: '', options: ['', ''],
-    correctAnswer: null, category: 'Pensamiento Critico',
-    difficulty: 'medium', timeLimit: 20, points: 100, errors: []
+function emptyForm() {
+  return { text: '', timeLimit: 20, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }] }
+}
+
+const shareUrl = computed(() => currentSession.value ? `${window.location.origin}/join?code=${currentSession.value.code}` : '')
+
+onMounted(async () => {
+  await fetchActiveSessions()
+  const codeFromUrl = route.query.code
+  if (codeFromUrl) { await loadSession(codeFromUrl.toUpperCase()); return }
+  const saved = localStorage.getItem('quizhive_admin_code')
+  if (saved) {
+    try {
+      const { data } = await axios.get(`${API}/api/sessions/${saved}`)
+      // 🔄 FIX: verificar status 'active' (no 'waiting')
+      if (data.status === 'active') currentSession.value = data
+      else localStorage.removeItem('quizhive_admin_code')
+    } catch { localStorage.removeItem('quizhive_admin_code') }
   }
-}
-
-const questions = ref([createEmptyQuestion()])
-
-function addQuestion() {
-  if (questions.value.length < 25) questions.value.push(createEmptyQuestion())
-}
-function removeQuestion(index) {
-  if (questions.value.length > 1) questions.value.splice(index, 1)
-}
-function moveQuestion(index, direction) {
-  const newIndex = index + direction
-  if (newIndex >= 0 && newIndex < questions.value.length) {
-    const temp = questions.value[index]
-    questions.value[index] = questions.value[newIndex]
-    questions.value[newIndex] = temp
-  }
-}
-function addOption(questionIndex) {
-  const q = questions.value[questionIndex]
-  if (q.options.length < 6) q.options.push('')
-}
-function removeOption(questionIndex, optionIndex) {
-  const q = questions.value[questionIndex]
-  if (q.options.length > 2) {
-    q.options.splice(optionIndex, 1)
-    if (q.correctAnswer === optionIndex) q.correctAnswer = null
-    else if (q.correctAnswer > optionIndex) q.correctAnswer--
-  }
-}
-function validateQuestion(index) {
-  const q = questions.value[index]
-  const errors = []
-  if (!q.question || q.question.trim().length === 0) errors.push('El texto de la pregunta es obligatorio')
-  if (!q.options || q.options.length < 2) errors.push('Debe tener al menos 2 opciones (solo opcion multiple)')
-  const emptyOptions = q.options.filter(opt => !opt || opt.trim() === '')
-  if (emptyOptions.length > 0) errors.push('Todas las opciones deben tener texto')
-  if (q.correctAnswer === null || q.correctAnswer === undefined) errors.push('Debes seleccionar la respuesta correcta')
-  else if (q.correctAnswer < 0 || q.correctAnswer >= q.options.length) errors.push('La respuesta correcta no es valida')
-  q.errors = errors
-  return errors.length === 0
-}
-function validateAllQuestions() {
-  let allValid = true
-  for (let i = 0; i < questions.value.length; i++) {
-    if (!validateQuestion(i)) allValid = false
-  }
-  return allValid
-}
-
-const isQuestionsValid = computed(() => {
-  if (questions.value.length === 0) return false
-  return questions.value.every(q =>
-    q.question.trim() !== '' && q.options.length >= 2 &&
-    q.options.every(opt => opt.trim() !== '') &&
-    q.correctAnswer !== null && q.correctAnswer >= 0 && q.correctAnswer < q.options.length
-  )
 })
 
-function goToStep2() { if (sessionTitle.value.trim()) step.value = 2 }
-function goToStep3() { if (validateAllQuestions()) step.value = 3 }
+async function fetchActiveSessions() {
+  try {
+    const { data } = await axios.get(`${API}/api/sessions`)
+    // 🔄 FIX: filtrar 'active' (no 'waiting')
+    activeSessions.value = data.filter(s => s.status === 'active')
+  } catch { /* silent */ }
+}
 
 async function createSession() {
-  if (!validateAllQuestions()) return
-  isCreating.value = true
+  if (!newTitle.value.trim()) return
+  creating.value = true; createError.value = ''
   try {
-    const payload = {
-      title: sessionTitle.value.trim(),
-      questions: questions.value.map(q => ({
-        question: q.question.trim(), options: q.options.map(opt => opt.trim()),
-        correctAnswer: q.correctAnswer, category: q.category,
-        difficulty: q.difficulty, timeLimit: q.timeLimit, points: q.points
-      })),
-      settings: { timePerQuestion: timePerQuestion.value, showLeaderboard: showLeaderboard.value }
-    }
-    const res = await axios.post(`${API_URL}/api/sessions/create-with-questions`, payload)
-    if (res.data.success) {
-      createdSession.value = res.data.session
-      step.value = 4
-    }
-  } catch (err) {
-    alert(err.response?.data?.error || 'Error al crear la partida')
-  } finally {
-    isCreating.value = false
-  }
+    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() })
+    currentSession.value = data
+    localStorage.setItem('quizhive_admin_code', data.code)
+    newTitle.value = ''
+  } catch (e) { createError.value = e.response?.data?.error || 'Error al crear la partida.' }
+  finally { creating.value = false }
+}
+
+async function loadSession(code) {
+  try {
+    const { data } = await axios.get(`${API}/api/sessions/${code}`)
+    currentSession.value = data
+    localStorage.setItem('quizhive_admin_code', data.code)
+  } catch { alert('No se pudo cargar la partida.') }
+}
+
+function exitSession() {
+  currentSession.value = null
+  localStorage.removeItem('quizhive_admin_code')
+  router.push('/dashboard')
+}
+
+async function deleteSession() {
+  if (!confirm('¿Eliminar esta partida y todas sus preguntas?')) return
+  try {
+    await axios.delete(`${API}/api/sessions/${currentSession.value.code}`)
+    exitSession()
+  } catch { alert('Error al eliminar la partida.') }
 }
 
 function copyCode() {
-  navigator.clipboard.writeText(createdSession.value.code)
-  copied.value = true
-  setTimeout(() => copied.value = false, 2000)
+  navigator.clipboard.writeText(currentSession.value.code)
+  codeCopied.value = true
+  setTimeout(() => (codeCopied.value = false), 2000)
 }
-function copyLink() {
-  const link = `${window.location.origin}/join?code=${createdSession.value.code}`
-  navigator.clipboard.writeText(link)
-  copied.value = true
-  setTimeout(() => copied.value = false, 2000)
+
+function shareLink() {
+  if (navigator.share) {
+    navigator.share({ title: currentSession.value.title, url: shareUrl.value })
+  } else {
+    navigator.clipboard.writeText(shareUrl.value)
+    alert('Enlace copiado al portapapeles.')
+  }
 }
-function shareWhatsApp() {
-  const text = encodeURIComponent(`🎮 Unete a mi partida en MANTIS!\n\nCodigo: *${createdSession.value.code}*\nTitulo: ${sessionTitle.value}\n\nEntra aqui: ${window.location.origin}/join?code=${createdSession.value.code}`)
-  window.open(`https://wa.me/?text=${text}`, '_blank')
+
+function openQuestionForm(index) {
+  editIndex.value = index; formError.value = ''
+  if (index === null) { form.value = emptyForm() }
+  else {
+    const q = currentSession.value.questions[index]
+    form.value = {
+      text: q.text,
+      timeLimit: q.timeLimit,
+      options: q.options.map(o => ({ text: o.text, isCorrect: o.isCorrect }))
+    }
+  }
+  showForm.value = true
 }
-function shareTelegram() {
-  const text = encodeURIComponent(`🎮 Unete a mi partida en MANTIS!\n\nCodigo: ${createdSession.value.code}\nTitulo: ${sessionTitle.value}`)
-  const url = encodeURIComponent(`${window.location.origin}/join?code=${createdSession.value.code}`)
-  window.open(`https://t.me/share/url?url=${url}&text=${text}`, '_blank')
+
+function closeForm() { showForm.value = false; formError.value = '' }
+
+function addOption() {
+  if (form.value.options.length < 6) form.value.options.push({ text: '', isCorrect: false })
 }
-function shareEmail() {
-  const subject = encodeURIComponent(`Invitacion a partida MANTIS: ${sessionTitle.value}`)
-  const body = encodeURIComponent(`Hola!\n\nTe invito a unirte a mi partida en MANTIS.\n\nCodigo de sala: ${createdSession.value.code}\nTitulo: ${sessionTitle.value}\n\nPara unirte, visita: ${window.location.origin}/join?code=${createdSession.value.code}\n\nNos vemos en el juego!`)
-  window.open(`mailto:?subject=${subject}&body=${body}`)
+
+function removeOption(i) {
+  if (form.value.options.length <= 2) return
+  const wasCorrect = form.value.options[i].isCorrect
+  form.value.options.splice(i, 1)
+  if (wasCorrect) form.value.options[0].isCorrect = true
 }
-function resetAndNew() {
-  step.value = 1
-  sessionTitle.value = ''
-  timePerQuestion.value = 20
-  showLeaderboard.value = true
-  questions.value = [createEmptyQuestion()]
-  createdSession.value = null
-  questionIdCounter = 0
+
+function setCorrect(i) {
+  form.value.options.forEach((o, idx) => (o.isCorrect = idx === i))
+}
+
+function validateForm() {
+  if (!form.value.text.trim()) return 'El texto de la pregunta es requerido.'
+  if (form.value.options.length < 2) return 'Se requieren al menos 2 opciones.'
+  if (form.value.options.some(o => !o.text.trim())) return 'Todas las opciones deben tener texto.'
+  const correctCount = form.value.options.filter(o => o.isCorrect).length
+  if (correctCount !== 1) return 'Debe haber exactamente 1 respuesta correcta.'
+  return null
+}
+
+async function saveQuestion() {
+  const err = validateForm()
+  if (err) { formError.value = err; return }
+  saving.value = true; formError.value = ''
+  const code = currentSession.value.code
+  const payload = { text: form.value.text.trim(), options: form.value.options, timeLimit: form.value.timeLimit }
+  try {
+    let res
+    if (editIndex.value === null) {
+      res = await axios.post(`${API}/api/sessions/${code}/questions`, payload)
+    } else {
+      res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload)
+    }
+    currentSession.value = res.data
+    closeForm()
+  } catch (e) { formError.value = e.response?.data?.error || 'Error al guardar la pregunta.' }
+  finally { saving.value = false }
+}
+
+async function deleteQuestion(idx) {
+  if (!confirm('¿Eliminar esta pregunta?')) return
+  try {
+    const { data } = await axios.delete(`${API}/api/sessions/${currentSession.value.code}/questions/${idx}`)
+    currentSession.value = data
+  } catch { alert('Error al eliminar la pregunta.') }
 }
 </script>
 
 <style scoped>
-.admin-container { min-height: 100vh; background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%); color: #e0e0e0; }
-.admin-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 2rem; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1); }
-.logo-section { display: flex; align-items: center; gap: 0.75rem; }
-.admin-logo { height: 40px; width: auto; }
-.logo-text { font-size: 1.5rem; font-weight: 800; background: linear-gradient(135deg, #00d4aa, #00a8e8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-.header-actions { display: flex; align-items: center; gap: 1rem; }
-.user-badge { padding: 0.4rem 1rem; background: rgba(0,212,170,0.15); border: 1px solid rgba(0,212,170,0.3); border-radius: 20px; font-size: 0.875rem; color: #00d4aa; }
-.btn-logout { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #e0e0e0; padding: 0.5rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-.btn-logout:hover { background: rgba(255,50,50,0.2); border-color: rgba(255,50,50,0.4); color: #ff4444; }
-.admin-main { max-width: 900px; margin: 0 auto; padding: 2rem; }
-.step-section { animation: fadeIn 0.4s ease; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.step-header { text-align: center; margin-bottom: 2rem; }
-.step-badge { display: inline-flex; align-items: center; justify-content: center; width: 48px; height: 48px; background: linear-gradient(135deg, #00d4aa, #00a8e8); border-radius: 50%; font-size: 1.25rem; font-weight: 700; color: #0f0f1a; margin-bottom: 1rem; }
-.step-header h2 { font-size: 1.75rem; margin-bottom: 0.5rem; color: #fff; }
-.step-desc { color: #888; font-size: 1rem; }
-.badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin-right: 0.5rem; }
-.badge-info { background: rgba(0,168,232,0.2); color: #00a8e8; border: 1px solid rgba(0,168,232,0.3); }
-.form-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 2rem; margin-bottom: 2rem; }
-.form-group { margin-bottom: 1.5rem; }
-.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: #ccc; }
-.form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.75rem 1rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; color: #fff; font-size: 1rem; transition: all 0.2s; }
-.form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: #00d4aa; box-shadow: 0 0 0 3px rgba(0,212,170,0.1); }
-.form-group textarea { resize: vertical; min-height: 60px; }
-.required { color: #ff6b6b; }
-.hint { color: #666; font-size: 0.8rem; font-weight: 400; margin-left: 0.5rem; }
-.settings-row { display: flex; gap: 2rem; flex-wrap: wrap; }
-.setting-item { flex: 1; min-width: 200px; }
-.setting-label { display: block; margin-bottom: 0.5rem; color: #aaa; font-size: 0.9rem; }
-.time-selector { display: flex; align-items: center; gap: 0.75rem; }
-.time-selector button { width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: #fff; cursor: pointer; font-size: 1.2rem; transition: all 0.2s; }
-.time-selector button:hover:not(:disabled) { background: rgba(0,212,170,0.2); border-color: #00d4aa; }
-.time-value { font-size: 1.25rem; font-weight: 600; color: #00d4aa; min-width: 60px; text-align: center; }
-.toggle-label { display: flex; align-items: center; gap: 0.75rem; cursor: pointer; }
-.toggle-label input { display: none; }
-.toggle-slider { width: 48px; height: 26px; background: rgba(255,255,255,0.15); border-radius: 13px; position: relative; transition: all 0.3s; flex-shrink: 0; }
-.toggle-slider::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 3px; left: 3px; transition: all 0.3s; }
-.toggle-label input:checked + .toggle-slider { background: #00d4aa; }
-.toggle-label input:checked + .toggle-slider::after { left: 25px; }
-.toggle-text { color: #aaa; font-size: 0.9rem; }
-.questions-container { display: flex; flex-direction: column; gap: 1.5rem; margin-bottom: 2rem; }
-.question-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.5rem; transition: all 0.2s; }
-.question-card:hover { border-color: rgba(255,255,255,0.2); }
-.question-card.has-error { border-color: rgba(255,100,100,0.4); background: rgba(255,50,50,0.05); }
-.question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.question-number { font-weight: 600; color: #00d4aa; font-size: 1.1rem; }
-.question-actions { display: flex; gap: 0.25rem; }
-.options-section { margin: 1rem 0; }
-.options-section label { display: block; margin-bottom: 0.75rem; font-weight: 500; color: #ccc; }
-.options-list { display: flex; flex-direction: column; gap: 0.5rem; }
-.option-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; border-radius: 10px; transition: all 0.2s; }
-.option-row.correct-option { background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.3); }
-.option-letter { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 8px; font-weight: 700; color: #888; flex-shrink: 0; }
-.option-row.correct-option .option-letter { background: #00d4aa; color: #0f0f1a; }
-.option-row input { flex: 1; padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.95rem; }
-.option-row input:focus { outline: none; border-color: #00a8e8; }
-.correct-radio { cursor: pointer; padding: 0.25rem; }
-.correct-radio input { display: none; }
-.radio-indicator { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: #555; transition: all 0.2s; }
-.correct-radio input:checked + .radio-indicator { color: #00d4aa; }
-.radio-indicator .material-icons { font-size: 24px; }
-.btn-icon { background: transparent; border: none; color: #888; cursor: pointer; padding: 0.4rem; border-radius: 6px; transition: all 0.2s; display: flex; align-items: center; justify-content: center; }
-.btn-icon:hover:not(:disabled) { background: rgba(255,255,255,0.1); color: #fff; }
-.btn-icon:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn-icon.btn-danger:hover { background: rgba(255,50,50,0.2); color: #ff4444; }
-.btn-icon.btn-sm { padding: 0.2rem; }
-.btn-icon.btn-sm .material-icons { font-size: 18px; }
-.btn-add-option { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; padding: 0.5rem 1rem; background: transparent; border: 1px dashed rgba(0,168,232,0.4); color: #00a8e8; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.2s; }
-.btn-add-option:hover { background: rgba(0,168,232,0.1); border-style: solid; }
-.question-settings { display: flex; gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.05); }
-.setting-field { flex: 1; }
-.setting-field label { display: block; font-size: 0.8rem; color: #888; margin-bottom: 0.25rem; }
-.setting-field input, .setting-field select { width: 100%; padding: 0.4rem 0.6rem; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #fff; font-size: 0.9rem; }
-.errors-box { display: flex; align-items: flex-start; gap: 0.5rem; margin-top: 0.75rem; padding: 0.75rem; background: rgba(255,50,50,0.1); border-radius: 8px; color: #ff6b6b; font-size: 0.85rem; }
-.errors-box .material-icons { font-size: 18px; flex-shrink: 0; }
-.errors-box ul { margin: 0; padding-left: 1rem; }
-.btn-add-question { display: flex; align-items: center; justify-content: center; gap: 0.5rem; width: 100%; padding: 1rem; background: rgba(0,212,170,0.1); border: 2px dashed rgba(0,212,170,0.3); color: #00d4aa; border-radius: 12px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.2s; }
-.btn-add-question:hover:not(:disabled) { background: rgba(0,212,170,0.2); border-style: solid; }
-.btn-add-question:disabled { opacity: 0.4; cursor: not-allowed; }
-.count { color: #888; font-size: 0.85rem; }
-.form-actions { display: flex; justify-content: center; gap: 1rem; margin-top: 2rem; }
-.form-actions.step-nav { justify-content: space-between; }
-.btn-primary, .btn-secondary { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1.5rem; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; text-decoration: none; }
-.btn-primary { background: linear-gradient(135deg, #00d4aa, #00a8e8); color: #0f0f1a; }
-.btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,212,170,0.3); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
-.btn-secondary:hover { background: rgba(255,255,255,0.15); color: #fff; }
-.btn-large { padding: 1rem 2rem; font-size: 1.1rem; }
-.btn-create { min-width: 200px; justify-content: center; }
-.review-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 2rem; margin-bottom: 2rem; }
-.review-section { margin-bottom: 2rem; }
-.review-section:last-child { margin-bottom: 0; }
-.review-section h3 { color: #00d4aa; margin-bottom: 1rem; font-size: 1.1rem; }
-.review-row { display: flex; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.review-label { width: 180px; color: #888; flex-shrink: 0; }
-.review-value { color: #fff; font-weight: 500; }
-.questions-summary { display: flex; flex-direction: column; gap: 0.5rem; }
-.summary-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
-.summary-num { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: rgba(0,212,170,0.2); color: #00d4aa; border-radius: 6px; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
-.summary-text { flex: 1; color: #ddd; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.summary-badge { padding: 0.2rem 0.5rem; background: rgba(0,168,232,0.15); color: #00a8e8; border-radius: 4px; font-size: 0.75rem; flex-shrink: 0; }
-.summary-correct { padding: 0.2rem 0.5rem; background: rgba(0,212,170,0.15); color: #00d4aa; border-radius: 4px; font-size: 0.75rem; font-weight: 600; flex-shrink: 0; }
-.success-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(0,212,170,0.2); border-radius: 20px; padding: 3rem 2rem; text-align: center; max-width: 600px; margin: 0 auto; }
-.success-icon { margin-bottom: 1rem; }
-.success-icon .material-icons { font-size: 64px; color: #00d4aa; }
-.success-card h2 { font-size: 2rem; color: #fff; margin-bottom: 0.5rem; }
-.success-subtitle { color: #888; margin-bottom: 2rem; }
-.code-section { margin: 2rem 0; }
-.code-section label { display: block; color: #888; margin-bottom: 0.5rem; font-size: 0.9rem; }
-.code-display { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem 2rem; background: linear-gradient(135deg, rgba(0,212,170,0.15), rgba(0,168,232,0.15)); border: 2px solid rgba(0,212,170,0.4); border-radius: 16px; cursor: pointer; transition: all 0.2s; }
-.code-display:hover { border-color: #00d4aa; box-shadow: 0 0 30px rgba(0,212,170,0.2); }
-.code-text { font-size: 3rem; font-weight: 800; letter-spacing: 8px; color: #00d4aa; font-family: 'Courier New', monospace; }
-.btn-copy { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 0.5rem; border-radius: 8px; cursor: pointer; transition: all 0.2s; }
-.btn-copy:hover, .btn-copy.copied { background: rgba(0,212,170,0.2); border-color: #00d4aa; color: #00d4aa; }
-.copy-feedback { display: block; margin-top: 0.5rem; color: #00d4aa; font-size: 0.9rem; }
-.share-section { margin: 2rem 0; }
-.share-section h3 { color: #ccc; margin-bottom: 1rem; font-size: 1rem; }
-.share-buttons { display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap; }
-.btn-share { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 1rem; border-radius: 10px; border: none; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
-.btn-whatsapp { background: #25d366; color: #fff; }
-.btn-whatsapp:hover { background: #1ebe57; }
-.btn-telegram { background: #0088cc; color: #fff; }
-.btn-telegram:hover { background: #0077b3; }
-.btn-email { background: #ea4335; color: #fff; }
-.btn-email:hover { background: #d33b28; }
-.btn-copy-link { background: rgba(255,255,255,0.1); color: #ccc; border: 1px solid rgba(255,255,255,0.2); }
-.btn-copy-link:hover { background: rgba(255,255,255,0.2); color: #fff; }
-.share-icon { width: 18px; height: 18px; }
-.qr-section { margin: 1.5rem 0; color: #888; }
-.qr-section p { margin-bottom: 0.5rem; }
-.qr-placeholder { display: inline-flex; align-items: center; gap: 0.5rem; padding: 1rem 2rem; background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2); border-radius: 12px; color: #666; }
-.qr-placeholder .material-icons { font-size: 32px; }
-.success-actions { display: flex; flex-direction: column; gap: 1rem; margin-top: 2rem; }
-.success-actions .btn-primary, .success-actions .btn-secondary { justify-content: center; }
-.spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(15,15,26,0.3); border-top-color: #0f0f1a; border-radius: 50%; animation: spin 0.8s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
-@media (max-width: 768px) {
-  .admin-main { padding: 1rem; }
-  .code-text { font-size: 2rem; letter-spacing: 4px; }
-  .share-buttons { flex-direction: column; align-items: stretch; }
-  .btn-share { justify-content: center; }
-  .form-actions.step-nav { flex-direction: column; }
-  .question-settings { flex-direction: column; gap: 0.5rem; }
-}
+.admin-view { min-height: 100vh; background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+.admin-header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; }
+.header-inner { max-width: 900px; margin: 0 auto; display: flex; align-items: center; gap: 1rem; }
+.logo { font-size: 1.5rem; color: #16a34a; font-weight: 700; }
+h1 { font-size: 1.2rem; font-weight: 600; color: #0f172a; margin: 0; }
+.back-link { color: #64748b; text-decoration: none; font-size: .85rem; padding: .3rem .7rem; border: 1px solid #e2e8f0; border-radius: 6px; transition: all .2s; white-space: nowrap; }
+.back-link:hover { color: #0f172a; border-color: #cbd5e1; }
+.admin-main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+h2 { margin: 0 0 .4rem; font-size: 1.25rem; color: #0f172a; }
+.subtitle { color: #64748b; font-size: .9rem; margin: 0 0 1.2rem; }
+.create-card { max-width: 540px; margin: 0 auto; width: 100%; }
+.code-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.code-display { display: flex; align-items: center; gap: 1rem; background: #f0fdf4; border: 2px solid #16a34a; border-radius: 10px; padding: .8rem 1.2rem; margin-bottom: 1rem; }
+.room-code { font-size: 2.8rem; font-weight: 800; letter-spacing: .4rem; color: #16a34a; font-family: 'Courier New', monospace; flex: 1; }
+.share-row { display: flex; gap: .5rem; margin-bottom: 1rem; }
+.share-input { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; color: #64748b; padding: .4rem .8rem; font-size: .85rem; }
+.session-meta { display: flex; align-items: center; gap: 1rem; font-size: .9rem; color: #64748b; }
+.questions-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.empty-state { text-align: center; padding: 2rem; color: #94a3b8; border: 2px dashed #e2e8f0; border-radius: 8px; }
+.question-list { display: flex; flex-direction: column; gap: .75rem; }
+.question-item { display: flex; align-items: flex-start; gap: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .9rem 1rem; transition: border-color .2s; }
+.question-item:hover { border-color: #16a34a; }
+.question-num { min-width: 28px; height: 28px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; flex-shrink: 0; }
+.question-body { flex: 1; }
+.question-text { margin: 0 0 .5rem; font-size: .95rem; color: #1e293b; }
+.options-preview { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+.opt-chip { font-size: .75rem; padding: .15rem .55rem; border-radius: 20px; background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.opt-chip.correct { background: #dcfce7; color: #16a34a; border-color: #16a34a; font-weight: 600; }
+.time-label { font-size: .75rem; color: #94a3b8; }
+.question-actions { display: flex; gap: .4rem; flex-shrink: 0; }
+.field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1rem; }
+.field label { font-size: .85rem; color: #475569; font-weight: 500; }
+input[type="text"], input[type="number"], textarea { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; color: #1e293b; padding: .6rem .8rem; font-size: .95rem; outline: none; transition: border-color .2s, box-shadow .2s; font-family: inherit; resize: vertical; }
+input:focus, textarea:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.1); }
+input[type="number"] { width: 80px; }
+.btn-primary { background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: .6rem 1.2rem; font-size: .95rem; font-weight: 600; cursor: pointer; transition: background .2s, opacity .2s; }
+.btn-primary:hover:not(:disabled) { background: #15803d; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.btn-ghost { background: transparent; color: #64748b; border: 1px solid #e2e8f0; border-radius: 6px; padding: .5rem 1rem; cursor: pointer; font-size: .9rem; transition: color .2s, border-color .2s; }
+.btn-ghost:hover { color: #0f172a; border-color: #cbd5e1; }
+.btn-copy { background: #f8fafc; border: 1px solid #e2e8f0; color: #1e293b; border-radius: 6px; padding: .4rem .9rem; cursor: pointer; font-size: .85rem; transition: background .2s; }
+.btn-copy.copied { background: #dcfce7; color: #16a34a; border-color: #16a34a; }
+.btn-share { background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: .4rem .9rem; cursor: pointer; font-size: .85rem; white-space: nowrap; }
+.btn-icon { background: transparent; border: 1px solid #e2e8f0; border-radius: 6px; padding: .3rem .5rem; cursor: pointer; font-size: .9rem; color: #94a3b8; transition: all .2s; }
+.btn-icon:hover { border-color: #cbd5e1; color: #475569; }
+.btn-icon.btn-del:hover { border-color: #fca5a5; color: #dc2626; }
+.btn-danger-sm { background: transparent; border: 1px solid #fecaca; color: #dc2626; border-radius: 6px; padding: .3rem .7rem; font-size: .8rem; cursor: pointer; margin-left: auto; transition: background .2s; }
+.btn-danger-sm:hover { background: #fef2f2; }
+.btn-add-option { background: transparent; border: 1px dashed #e2e8f0; color: #64748b; border-radius: 6px; padding: .4rem 1rem; width: 100%; cursor: pointer; font-size: .85rem; margin-top: .4rem; transition: all .2s; }
+.btn-add-option:hover { border-color: #16a34a; color: #16a34a; }
+.badge { font-size: .75rem; padding: .2rem .6rem; border-radius: 20px; font-weight: 600; }
+.badge-active { background: #dcfce7; color: #16a34a; }
+.badge-finished { background: #fee2e2; color: #dc2626; }
+.error-msg { color: #dc2626; font-size: .85rem; margin-top: .4rem; }
+.prev-sessions { margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }
+.prev-sessions h3 { font-size: .9rem; color: #64748b; margin-bottom: .7rem; }
+.prev-item { display: flex; align-items: center; gap: .75rem; padding: .5rem .75rem; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; transition: border-color .2s; margin-bottom: .4rem; }
+.prev-item:hover { border-color: #16a34a; }
+.prev-title { flex: 1; font-size: .9rem; color: #1e293b; }
+.prev-code { font-family: monospace; font-size: .85rem; color: #16a34a; font-weight: 700; }
+.prev-count { font-size: .8rem; color: #94a3b8; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; }
+.modal-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.1); }
+.modal-card h2 { margin: 0 0 1.2rem; color: #0f172a; }
+.modal-actions { display: flex; justify-content: flex-end; gap: .75rem; margin-top: 1.2rem; }
+.options-section { margin-bottom: 1rem; }
+.options-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: .3rem; }
+.options-hint { font-size: .8rem; color: #94a3b8; }
+.options-rule { font-size: .8rem; color: #b45309; margin-bottom: .7rem; }
+.option-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; padding: .4rem .6rem; border-radius: 6px; background: #f8fafc; border: 1px solid #e2e8f0; transition: border-color .2s; }
+.option-row.option-correct { border-color: #16a34a; background: #f0fdf4; }
+.correct-toggle { background: transparent; border: none; cursor: pointer; font-size: 1rem; padding: 0; min-width: 1.5rem; }
+.option-input { flex: 1; background: transparent; border: none; color: #1e293b; font-size: .9rem; outline: none; padding: .1rem 0; }
+.modal-enter-active, .modal-leave-active { transition: opacity .2s, transform .2s; }
+.modal-enter-from, .modal-leave-to { opacity: 0; transform: scale(.96); }
+.qlist-enter-active, .qlist-leave-active { transition: all .25s; }
+.qlist-enter-from { opacity: 0; transform: translateY(-8px); }
+.qlist-leave-to { opacity: 0; transform: translateX(10px); }
 </style>
