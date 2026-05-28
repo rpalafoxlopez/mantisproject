@@ -68,13 +68,20 @@ export function setupGameSocket(io) {
         }
 
         const session = await Session.findOne({ code: cleanCode });
+        // En player:join, después de obtener la sesión:
         if (!session) {
           return socket.emit('error', { message: 'Código de partida inválido.' });
         }
+
+        // 🔄 MIGRACIÓN: Convertir sesiones viejas 'waiting' → 'active'
+        if (session.status === 'waiting') {
+          session.status = 'active';
+          await session.save();
+        }
+
         if (session.status === 'finished') {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
-
         // 🧹 Limpiar players con sockets muertos
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
         const originalCount = session.players.length;
