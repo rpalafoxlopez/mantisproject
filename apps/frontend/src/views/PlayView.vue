@@ -1,4 +1,4 @@
-<template>
+<<template>
   <div class="play-view">
     <header class="play-header">
       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
@@ -10,7 +10,7 @@
 
     <main class="play-main">
       <!-- QUIZ EN PROGRESO -->
-      <section v-if="!showResults" class="quiz-container">
+      <section v-if="!showResults && questions.length > 0" class="quiz-container">
         <div class="question-nav">
           <button
             v-for="(_, i) in questions"
@@ -27,7 +27,7 @@
           </button>
         </div>
 
-        <div class="question-card" v-if="currentQuestion < questions.length">
+        <div class="question-card">
           <span class="q-counter">Pregunta {{ currentQuestion + 1 }} de {{ totalQuestions }}</span>
           <h2 class="q-text">{{ questions[currentQuestion].text }}</h2>
 
@@ -97,6 +97,13 @@
         </div>
       </section>
 
+      <!-- CARGANDO -->
+      <section v-else-if="!showResults && questions.length === 0" class="card loading-card">
+        <div class="spinner-big"></div>
+        <h2>Conectando al quiz…</h2>
+        <p class="subtitle">Espera un momento</p>
+      </section>
+
       <!-- RESULTADOS FINALES -->
       <section v-else class="results-card">
         <h2>🏆 Resultados</h2>
@@ -157,11 +164,13 @@ const totalPlayers = ref(0)
 const correctCount = ref(0)
 const leaderboard = ref([])
 const showResults = ref(false)
+const connectionError = ref('')
 
 const answeredCount = computed(() => Object.keys(answers.value).length)
 
 let socket = null
 let questionStartTime = 0
+let hasJoined = false
 
 onMounted(() => {
   if (!code.value || !playerName.value) {
@@ -173,15 +182,23 @@ onMounted(() => {
     transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 5,
-    reconnectionDelay: 1000
+    reconnectionDelay: 1000,
+    timeout: 10000
   })
 
+  // ═══════════════════════════════════════════════════════
+  // ✅ FIX CRÍTICO: Emitir player:join DENTRO de connect
+  // ═══════════════════════════════════════════════════════
   socket.on('connect', () => {
-    console.log('✅ Socket conectado:', socket.id)
-    socket.emit('player:join', {
-      code: code.value,
-      name: playerName.value
-    })
+    console.log('✅ Socket conectado, uniendo al quiz...')
+    connectionError.value = ''
+    if (!hasJoined) {
+      hasJoined = true
+      socket.emit('player:join', {
+        code: code.value,
+        name: playerName.value
+      })
+    }
   })
 
   socket.on('player:joined', ({ title: t, questions: q, totalQuestions: total }) => {
@@ -196,6 +213,7 @@ onMounted(() => {
     showResults.value = false
     myScore.value = 0
     correctCount.value = 0
+    connectionError.value = ''
     questionStartTime = Date.now()
   })
 
@@ -229,16 +247,31 @@ onMounted(() => {
   })
 
   socket.on('error', ({ message }) => {
-    alert(message)
-    if (message.includes('terminó') || message.includes('inválido')) {
+    console.log('❌ Socket error:', message)
+    connectionError.value = message
+    if (message.includes('terminó') || message.includes('inválido') || message.includes('encontrada')) {
+      alert(message)
       router.push('/join')
     }
   })
 
-  socket.emit('player:join', {
-    code: code.value,
-    name: playerName.value
+  socket.on('connect_error', (err) => {
+    console.log('❌ Connect error:', err.message)
+    connectionError.value = 'Error de conexión con el servidor'
   })
+
+  socket.on('disconnect', (reason) => {
+    console.log('❌ Desconectado:', reason)
+    hasJoined = false
+  })
+
+  // Timeout de seguridad
+  setTimeout(() => {
+    if (questions.value.length === 0 && !connectionError.value) {
+      console.log('⏱️ Timeout esperando respuesta del servidor')
+      connectionError.value = 'El servidor no respondió. Intenta recargar la página.'
+    }
+  }, 10000)
 })
 
 onUnmounted(() => {
@@ -313,6 +346,10 @@ function goHome() {
 .answered-count { color: #64748b; font-size: .9rem; }
 
 .play-main { max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+
+.loading-card { text-align: center; padding: 3rem; }
+.spinner-big { width: 48px; height: 48px; border: 4px solid #e2e8f0; border-top-color: #16a34a; border-radius: 50%; animation: spin .8s linear infinite; margin: 0 auto 1rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .question-nav { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.5rem; justify-content: center; }
 .nav-dot { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #e2e8f0; background: #fff; cursor: pointer; font-weight: 600; font-size: .85rem; transition: all .2s; }
