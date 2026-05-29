@@ -30,10 +30,10 @@
           <div class="share-bar">
             <span class="share-label">Compartir:</span>
             <button class="btn-share-icon btn-whatsapp" @click="shareWhatsApp" title="WhatsApp">
-              <img src="/img/whatsapp-icon.svg" alt="WA" />
+              <!-- <img src="/img/whatsapp-icon.svg" alt="WA" /> -->
             </button>
             <button class="btn-share-icon btn-telegram" @click="shareTelegram" title="Telegram">
-              <img src="/img/telegram-icon.svg" alt="TG" />
+              <!-- <img src="/img/telegram-icon.svg" alt="TG" /> -->
             </button>
             <button class="btn-share-icon" @click="copyLink" title="Copiar link">
               <span class="material-icons">link</span>
