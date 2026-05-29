@@ -14,7 +14,11 @@
           </h1>
 
           <p class="max-w-xl mb-10 text-lg text-on-surface-variant">
-            Evalúa la capacidad de análisis en tiempo real con nuestra plataforma de cuestionarios corporativos diseñada para el alto rendimiento.
+            Pon a prueba a tu equipo. De verdad.
+            <br/>
+            No encuestas. <br/>
+            No slides. <br/>
+            Conocimiento real, presión real, resultados que importan.
           </p>
 
           <div class="flex flex-wrap gap-4">
@@ -104,7 +108,7 @@
       <div class="px-6 mx-auto max-w-7xl lg:px-10">
         <div class="max-w-2xl mx-auto mb-16 text-center">
           <h2 class="mb-4 text-3xl font-bold text-primary">Herramientas de Evaluación Corporativa</h2>
-          <p class="text-on-surface-variant">Elevamos los estándares de capacitación empresarial mediante analítica avanzada y metodologías de evaluación comprobadas.</p>
+          <p class="text-on-surface-variant"><b>Donde el conocimiento se demuestra</b> Deja de asumir quién sabe y quién no. QuizHive lo hace visible.</p>
         </div>
 
         <div class="grid gap-8 md:grid-cols-3">
@@ -113,7 +117,7 @@
               <span class="text-2xl material-symbols-outlined">timer</span>
             </div>
             <h3 class="mb-3 text-xl font-semibold text-primary">Tiempo Real</h3>
-            <p class="text-on-surface-variant">Respuestas instantáneas y análisis de datos en vivo para una retroalimentación inmediata durante las sesiones.</p>
+            <p class="text-on-surface-variant">Sin trampa, sin pausa. Respuestas en vivo que exponen el conocimiento al instante.</p>
           </div>
 
           <div class="p-8 transition-all duration-300 border bg-background rounded-xl border-border-subtle hover:border-secondary/30 group hover:-translate-y-2">
@@ -121,7 +125,7 @@
               <span class="text-2xl material-symbols-outlined">leaderboard</span>
             </div>
             <h3 class="mb-3 text-xl font-semibold text-primary">Panel de Resultados</h3>
-            <p class="text-on-surface-variant">Ranking en vivo y métricas detalladas por participante que permiten identificar brechas de conocimiento críticas.</p>
+            <p class="text-on-surface-variant">Rankings que no mienten. Identifica brechas antes de que te cuesten caro.</p>
           </div>
 
           <div class="p-8 transition-all duration-300 border bg-background rounded-xl border-border-subtle hover:border-secondary/30 group hover:-translate-y-2">
@@ -129,7 +133,7 @@
               <span class="text-2xl material-symbols-outlined">psychology</span>
             </div>
             <h3 class="mb-3 text-xl font-semibold text-primary">Evaluación Estratégica</h3>
-            <p class="text-on-surface-variant">Preguntas diseñadas para evaluar razonamiento lógico y resolución de problemas bajo presión profesional.</p>
+            <p class="text-on-surface-variant">Preguntas que no se aprenden de memoria. Se razonan o no se responden.</p>
           </div>
         </div>
       </div>
@@ -143,9 +147,12 @@
           <div class="relative flex items-center h-full p-12">
             <div class="max-w-lg text-white">
               <h2 class="mb-4 text-3xl font-bold">Transforma la cultura de tu empresa</h2>
-              <p class="mb-8 text-white/90">Nuestras herramientas ayudan a las organizaciones a desarrollar habilidades cognitivas esenciales para la toma de decisiones.</p>
+              <p class="mb-8 text-white/90">
+                  <b>El equipo que no se evalúa, no mejora.</b> Empieza hoy<br/> 
+                  <i>es gratis, es rápido, y vas a querer hacerlo de nuevo.</i>
+              </p>
               <router-link to="/register" class="inline-flex items-center gap-2 px-6 py-3 font-semibold transition-all bg-white rounded-lg text-primary hover:bg-secondary hover:text-white">
-                Comenzar Ahora
+                Empieza hoy
                 <span class="material-symbols-outlined">arrow_forward</span>
               </router-link>
             </div>
@@ -155,7 +162,7 @@
     </section>
 
     <!-- Footer -->
-    <footer class="w-full py-12 border-t bg-tertiary border-primary-container">
+    <footer class="w-full py-12 border-t bg-surface-white border-primary-container">
       <div class="grid gap-8 px-6 mx-auto max-w-7xl lg:px-10 md:grid-cols-2">
         <div class="space-y-4">
           <div class="flex items-center gap-2 text-lg font-bold text-white">
@@ -163,7 +170,8 @@
             QuizHive Enterprise
           </div>
           <p class="max-w-sm text-sm text-white/70">
-            La plataforma líder en evaluaciones críticas para el entorno corporativo. Ayudamos a equipos globales a pensar mejor, más rápido y con mayor precisión.
+            La plataforma líder en evaluaciones críticas para el entorno corporativo. <br/>
+            Ayudamos a equipos globales a pensar mejor, más rápido y con mayor precisión.
           </p>
           <p class="text-xs text-white/50">© 2024 QuizHive Enterprise. All rights reserved.</p>
         </div>
