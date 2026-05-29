@@ -165,26 +165,27 @@
     <footer class="w-full py-12 border-t bg-surface-white border-primary-container">
       <div class="grid gap-8 px-6 mx-auto max-w-7xl lg:px-10 md:grid-cols-2">
         <div class="space-y-4">
-          <div class="flex items-center gap-2 text-lg font-bold text-white">
-            <span class="material-symbols-outlined text-secondary">hive</span>
-            QuizHive Enterprise
+          <div class="flex items-center gap-2 text-lg font-bold text-black">
+              <router-link to="/" class="flex items-center gap-2 text-xl font-bold text-primary">
+                <img src="/img/quizhive.png" width="120" alt="QuizHive Logo" />
+              </router-link>
           </div>
-          <p class="max-w-sm text-sm text-white/70">
+          <p class="max-w-sm text-sm text-black/70">
             La plataforma líder en evaluaciones críticas para el entorno corporativo. <br/>
             Ayudamos a equipos globales a pensar mejor, más rápido y con mayor precisión.
           </p>
-          <p class="text-xs text-white/50">© 2024 QuizHive Enterprise. All rights reserved.</p>
+          <p class="text-xs text-black/50">© 2024 QuizHive Enterprise. All rights reserved.</p>
         </div>
         <div class="flex flex-wrap gap-x-12 gap-y-6 md:justify-end">
           <div class="flex flex-col gap-2">
-            <h4 class="mb-1 text-sm font-semibold text-white">Plataforma</h4>
-            <a href="#" class="text-sm transition-colors text-white/60 hover:text-white">Features</a>
-            <a href="#" class="text-sm transition-colors text-white/60 hover:text-white">Security</a>
+            <h4 class="mb-1 text-sm font-semibold text-black">Plataforma</h4>
+            <a href="#" class="text-sm transition-colors text-black/60 hover:text-grey">Features</a>
+            <a href="#" class="text-sm transition-colors text-black/60 hover:text-grey">Security</a>
           </div>
           <div class="flex flex-col gap-2">
-            <h4 class="mb-1 text-sm font-semibold text-white">Legal</h4>
-            <a href="#" class="text-sm transition-colors text-white/60 hover:text-white">Terms</a>
-            <a href="#" class="text-sm transition-colors text-white/60 hover:text-white">Privacy</a>
+            <h4 class="mb-1 text-sm font-semibold text-black">Legal</h4>
+            <a href="#" class="text-sm transition-colors text-black/60 hover:text-grey">Terms</a>
+            <a href="#" class="text-sm transition-colors text-black/60 hover:text-grey">Privacy</a>
           </div>
         </div>
       </div>
