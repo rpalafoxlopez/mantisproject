@@ -171,8 +171,7 @@
               </router-link>
           </div>
           <p class="max-w-sm text-sm text-black/70">
-            La plataforma líder en evaluaciones críticas para el entorno corporativo. <br/>
-            Ayudamos a equipos globales a pensar mejor, más rápido y con mayor precisión.
+            La plataforma líder en evaluaciones críticas para el entorno corporativo. Ayudamos a equipos globales a <b>pensar mejor</b>, <b>más rápido</b> y con mayor <b>precisión</b>.
           </p>
           <p class="text-xs text-black/50">© 2024 QuizHive Enterprise. All rights reserved.</p>
         </div>

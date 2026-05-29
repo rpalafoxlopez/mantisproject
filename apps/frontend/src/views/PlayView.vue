@@ -74,10 +74,11 @@
               <button
                 v-if="currentQuestion < questions.length - 1"
                 class="btn-nav primary"
-                @click="goToQuestion(currentQuestion + 1)"
+                @click="handleNext"
               >
-                Siguiente →
+                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
               </button>
+              <!-- goToQuestion(currentQuestion + 1) -->
               <button
                 v-else-if="answeredCount === totalQuestions"
                 class="btn-finish"
@@ -88,9 +89,9 @@
               <button
                 v-else
                 class="btn-nav"
-                @click="goToNextUnanswered"
+                @click="handleNext"
               >
-                Saltar a pendiente →
+                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
               </button>
             </div>
           </div>
@@ -311,6 +312,9 @@ function goToQuestion(idx) {
       showAnswerFeedback.value = true
       lastAnswerCorrect.value = prev.isCorrect
       lastPoints.value = prev.points
+      correctIndex.value = questions.value[idx].options.findIndex((o, i) => 
+        questions.value[idx].options[i]?.isCorrect
+      )
     }
   }
 }
@@ -335,6 +339,21 @@ function goHome() {
   localStorage.removeItem('quizhive_player_code')
   localStorage.removeItem('quizhive_player_name')
   router.push('/')
+}
+
+function handleNext() {
+  // Si hay opción seleccionada pero no confirmada, confirmar primero
+  if (selectedOption.value !== null && !showAnswerFeedback.value) {
+    submitAnswer()
+    // Esperar un momento para que se vea el feedback antes de avanzar
+    setTimeout(() => {
+      goToQuestion(currentQuestion.value + 1)
+    }, 1200)
+    return
+  }
+  
+  // Si ya confirmó o no seleccionó nada, solo avanzar
+  goToQuestion(currentQuestion.value + 1)
 }
 </script>
 
