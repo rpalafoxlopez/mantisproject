@@ -1,121 +1,163 @@
 <template>
   <div class="play-view">
-    <header class="play-header">
-      <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
-      <div class="progress-info">
-        <span class="score">⭐ {{ myScore }} pts</span>
-        <span class="answered-count">{{ answeredCount }}/{{ totalQuestions }}</span>
+    <!-- FORMULARIO DE ENTRADA (si falta nombre o código) -->
+    <div v-if="!code || !playerName" class="join-form-container">
+      <div class="join-card">
+        <img src="/img/quizhive.png" width="150" alt="QuizHive Logo">
+        <h2>Unirse al Quiz</h2>
+        <p>Ingresa el código y tu nombre para comenzar</p>
+        
+        <div class="form-group">
+          <label>Código del Quiz</label>
+          <input 
+            v-model="inputCode" 
+            type="text" 
+            placeholder="Ej: A3BL2D"
+            class="form-input"
+            maxlength="6"
+            @keyup.enter="submitJoin"
+          />
+        </div>
+        
+        <div class="form-group">
+          <label>Tu nombre</label>
+          <input 
+            v-model="inputName" 
+            type="text" 
+            placeholder="Ej: Juan Pérez"
+            class="form-input"
+            maxlength="30"
+            @keyup.enter="submitJoin"
+          />
+        </div>
+        
+        <button class="btn-join" @click="submitJoin" :disabled="!inputCode || !inputName">
+          Unirse al Quiz →
+        </button>
+        
+        <button class="btn-back" @click="goHome">← Volver al inicio</button>
       </div>
-      <button v-if="connectionError" class="btn-reload" @click="forcePageRefresh">
-        🔄 Recargar
-      </button>
-    </header>
-
-    <div v-if="isRetrying" class="retry-banner">
-      <div class="spinner-small"></div>
-      <span>Reconectando... Intento {{ sessionRetryCount }}/{{ maxRetries }}</span>
     </div>
 
-    <main class="play-main">
-      <section v-if="!showResults && questions.length > 0" class="quiz-container">
-        <div class="question-nav">
-          <button
-            v-for="(_, i) in questions"
-            :key="i"
-            class="nav-dot"
-            :class="{
-              current: currentQuestion === i,
-              answered: answers[i] !== undefined,
-              pending: answers[i] === undefined && currentQuestion !== i
-            }"
-            @click="goToQuestion(i)"
-          >
-            {{ i + 1 }}
-          </button>
+    <!-- PANTALLA DE JUEGO (normal) -->
+    <template v-else>
+      <header class="play-header">
+        <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
+        <div class="progress-info">
+          <span class="score">⭐ {{ myScore }} pts</span>
+          <span class="answered-count">{{ answeredCount }}/{{ totalQuestions }}</span>
         </div>
+        <button v-if="connectionError" class="btn-reload" @click="forcePageRefresh">
+          🔄 Recargar
+        </button>
+      </header>
 
-        <div class="question-card">
-          <span class="q-counter">Pregunta {{ currentQuestion + 1 }} de {{ totalQuestions }}</span>
-          <h2 class="q-text">{{ questions[currentQuestion].text }}</h2>
+      <div v-if="isRetrying" class="retry-banner">
+        <div class="spinner-small"></div>
+        <span>Reconectando... Intento {{ sessionRetryCount }}/{{ maxRetries }}</span>
+      </div>
 
-          <div class="options-list">
+      <main class="play-main">
+        <section v-if="!showResults && questions.length > 0" class="quiz-container">
+          <div class="question-nav">
             <button
-              v-for="(opt, i) in questions[currentQuestion].options"
+              v-for="(_, i) in questions"
               :key="i"
-              class="option-btn"
+              class="nav-dot"
               :class="{
-                selected: selectedOption === i,
-                correct: showAnswerFeedback && i === correctIndex,
-                wrong: showAnswerFeedback && selectedOption === i && i !== correctIndex
+                current: currentQuestion === i,
+                answered: answers[i] !== undefined,
+                pending: answers[i] === undefined && currentQuestion !== i
               }"
-              :disabled="showAnswerFeedback"
-              @click="selectOption(i)"
+              @click="goToQuestion(i)"
             >
-              <span class="opt-letter">{{ ['A','B','C','D','E','F'][i] }}</span>
-              <span class="opt-text">{{ opt.text }}</span>
+              {{ i + 1 }}
             </button>
           </div>
 
-          <div class="action-bar">
-            <button
-              v-if="!showAnswerFeedback && selectedOption !== null"
-              class="btn-confirm"
-              @click="submitAnswer"
-            >
-              Confirmar respuesta
-            </button>
+          <div class="question-card">
+            <span class="q-counter">Pregunta {{ currentQuestion + 1 }} de {{ totalQuestions }}</span>
+            <h2 class="q-text">{{ questions[currentQuestion].text }}</h2>
 
-            <div v-if="showAnswerFeedback" class="feedback-banner" :class="{ correct: lastAnswerCorrect }">
-              <span v-if="lastAnswerCorrect">✅ Correcto! +{{ lastPoints }} pts</span>
-              <span v-else>❌ Incorrecto. La correcta era {{ ['A','B','C','D','E','F'][correctIndex] }}</span>
-            </div>
-
-            <div class="nav-buttons">
-              <button v-if="currentQuestion > 0" class="btn-nav" @click="goToQuestion(currentQuestion - 1)">
-                ← Anterior
-              </button>
-              <button v-if="currentQuestion < questions.length - 1" class="btn-nav primary" @click="handleNext">
-                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
-              </button>
-              <button v-else-if="answeredCount === totalQuestions" class="btn-finish" @click="finishQuiz">
-                🏆 Ver resultados
-              </button>
-              <button v-else class="btn-nav" @click="handleNext">
-                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
+            <div class="options-list">
+              <button
+                v-for="(opt, i) in questions[currentQuestion].options"
+                :key="i"
+                class="option-btn"
+                :class="{
+                  selected: selectedOption === i,
+                  correct: showAnswerFeedback && i === correctIndex,
+                  wrong: showAnswerFeedback && selectedOption === i && i !== correctIndex
+                }"
+                :disabled="showAnswerFeedback"
+                @click="selectOption(i)"
+              >
+                <span class="opt-letter">{{ ['A','B','C','D','E','F'][i] }}</span>
+                <span class="opt-text">{{ opt.text }}</span>
               </button>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <section v-else-if="!showResults && questions.length === 0" class="card loading-card">
-        <div class="spinner-big"></div>
-        <h2>Conectando al quiz…</h2>
-        <p class="subtitle">Espera un momento</p>
-      </section>
+            <div class="action-bar">
+              <button
+                v-if="!showAnswerFeedback && selectedOption !== null"
+                class="btn-confirm"
+                @click="submitAnswer"
+              >
+                Confirmar respuesta
+              </button>
 
-      <section v-else class="results-card">
-        <h2>🏆 Resultados</h2>
-        <div class="personal-stats">
-          <div class="stat-big">
-            <span class="rank">#{{ personalRank }}</span>
-            <span class="of">de {{ totalPlayers }} jugadores</span>
+              <div v-if="showAnswerFeedback" class="feedback-banner" :class="{ correct: lastAnswerCorrect }">
+                <span v-if="lastAnswerCorrect">✅ Correcto! +{{ lastPoints }} pts</span>
+                <span v-else>❌ Incorrecto. La correcta era {{ ['A','B','C','D','E','F'][correctIndex] }}</span>
+              </div>
+
+              <div class="nav-buttons">
+                <button v-if="currentQuestion > 0" class="btn-nav" @click="goToQuestion(currentQuestion - 1)">
+                  ← Anterior
+                </button>
+                <button v-if="currentQuestion < questions.length - 1" class="btn-nav primary" @click="handleNext">
+                  {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
+                </button>
+                <button v-else-if="answeredCount === totalQuestions" class="btn-finish" @click="finishQuiz">
+                  🏆 Ver resultados
+                </button>
+                <button v-else class="btn-nav" @click="handleNext">
+                  {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="score-big">⭐ {{ myScore }} puntos</div>
-          <div class="detail">{{ correctCount }}/{{ totalQuestions }} correctas</div>
-        </div>
-        <h3>Top 10</h3>
-        <ol class="leaderboard">
-          <li v-for="(player, idx) in leaderboard" :key="idx" :class="{ 'is-you': player.name === playerName }">
-            <span class="pos">{{ idx + 1 }}</span>
-            <span class="name">{{ player.name }}</span>
-            <span class="correct">{{ player.correctCount }}/{{ totalQuestions }}</span>
-            <span class="score">⭐ {{ player.score }}</span>
-          </li>
-        </ol>
-        <button class="btn-home" @click="goHome">← Volver al inicio</button>
-      </section>
-    </main>
+        </section>
+
+        <section v-else-if="!showResults && questions.length === 0" class="card loading-card">
+          <div class="spinner-big"></div>
+          <h2>Conectando al quiz…</h2>
+          <p class="subtitle">Espera un momento</p>
+        </section>
+
+        <section v-else class="results-card">
+          <h2>🏆 Resultados</h2>
+          <div class="personal-stats">
+            <div class="stat-big">
+              <span class="rank">#{{ personalRank }}</span>
+              <span class="of">de {{ totalPlayers }} jugadores</span>
+            </div>
+            <div class="score-big">⭐ {{ myScore }} puntos</div>
+            <div class="detail">{{ correctCount }}/{{ totalQuestions }} correctas</div>
+          </div>
+          <h3>Top 10</h3>
+          <ol class="leaderboard">
+            <li v-for="(player, idx) in leaderboard" :key="idx" :class="{ 'is-you': player.name === playerName }">
+              <span class="pos">{{ idx + 1 }}</span>
+              <span class="name">{{ player.name }}</span>
+              <span class="correct">{{ player.correctCount }}/{{ totalQuestions }}</span>
+              <span class="score">⭐ {{ player.score }}</span>
+            </li>
+          </ol>
+          <button class="btn-home" @click="goHome">← Volver al inicio</button>
+        </section>
+      </main>
+    </template>
   </div>
 </template>
 
@@ -128,11 +170,15 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const route = useRoute()
 const router = useRouter()
 
-// Datos del jugador
+// Variables para el formulario
+const inputCode = ref('')
+const inputName = ref('')
+
+// Datos del jugador (vienen de URL o localStorage)
 const code = ref(route.query.code || localStorage.getItem('quizhive_player_code') || '')
 const playerName = ref(route.query.name || localStorage.getItem('quizhive_player_name') || '')
 
-// playerId persistente - UNA SOLA DECLARACIÓN
+// playerId persistente
 let playerId = localStorage.getItem('quizhive_player_id')
 if (!playerId) {
   playerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
@@ -168,6 +214,28 @@ let questionStartTime = 0
 let hasJoined = false
 let reconnectTimer = null
 
+// Función para enviar el formulario
+function submitJoin() {
+  if (!inputCode.value || !inputName.value) return
+  
+  code.value = inputCode.value.toUpperCase()
+  playerName.value = inputName.value.trim()
+  
+  localStorage.setItem('quizhive_player_code', code.value)
+  localStorage.setItem('quizhive_player_name', playerName.value)
+  
+  // Actualizar URL sin recargar
+  router.replace({
+    query: {
+      code: code.value,
+      name: playerName.value
+    }
+  })
+  
+  // Iniciar conexión
+  initSocket()
+}
+
 // Función para recargar la página
 function forcePageRefresh() {
   console.log('🔄 Forzando recarga de página...')
@@ -190,7 +258,6 @@ function resetAndRetry() {
     socket = null
   }
   
-  // Generar nuevo playerId
   const newPlayerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
   localStorage.setItem('quizhive_player_id', newPlayerId)
   playerId = newPlayerId
@@ -205,6 +272,8 @@ function resetAndRetry() {
 
 // Inicializar socket
 function initSocket() {
+  if (!code.value || !playerName.value) return
+  
   if (socket) {
     socket.disconnect()
     socket = null
@@ -283,14 +352,14 @@ function initSocket() {
         console.log('🔄 Nombre en uso, reintentando...')
         resetAndRetry()
       } else {
-        alert(`No se pudo conectar. Por favor, recarga la página.\n\nError: ${message}`)
+        alert(`No se pudo conectar. Por favor, recarga la página o cambia tu nombre.\n\nError: ${message}`)
         if (confirm('¿Quieres recargar la página?')) {
           forcePageRefresh()
         }
       }
     } else if (message.includes('terminó') || message.includes('inválido') || message.includes('encontrada')) {
       alert(message)
-      router.push('/join')
+      goHome()
     }
   })
 
@@ -370,21 +439,11 @@ function handleNext() {
   goToQuestion(currentQuestion.value + 1)
 }
 
-// Ciclo de vida
+// Ciclo de vida - solo inicializar si ya hay datos
 onMounted(() => {
-  if (!code.value || !playerName.value) {
-    router.push('/join')
-    return
+  if (code.value && playerName.value) {
+    initSocket()
   }
-  
-  initSocket()
-
-  setTimeout(() => {
-    if (questions.value.length === 0 && !connectionError.value && !isRetrying.value) {
-      console.log('⏱️ Timeout esperando respuesta')
-      connectionError.value = 'El servidor no respondió. Intenta recargar.'
-    }
-  }, 10000)
 })
 
 onUnmounted(() => {
@@ -395,11 +454,113 @@ onUnmounted(() => {
   }
 })
 
-// Exponer función global para debugging
 window.forceReload = forcePageRefresh
 </script>
 
 <style scoped>
+/* Estilos del formulario */
+.join-form-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+  padding: 1rem;
+}
+
+.join-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 24px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+}
+
+.join-card h2 {
+  color: #fff;
+  margin: 1rem 0 0.5rem;
+}
+
+.join-card p {
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.form-group {
+  text-align: left;
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  color: #00d4aa;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.form-input {
+  width: 100%;
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: #fff;
+  font-size: 1rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  border-color: #00d4aa;
+  box-shadow: 0 0 0 2px rgba(0,212,170,0.2);
+}
+
+.btn-join {
+  width: 100%;
+  background: linear-gradient(135deg, #00d4aa, #00a8e8);
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: #0f0f1a;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-join:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(0,212,170,0.3);
+}
+
+.btn-join:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-back {
+  width: 100%;
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.75rem;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+/* Resto de estilos existentes */
 .btn-reload {
   background: #f59e0b;
   color: #fff;
