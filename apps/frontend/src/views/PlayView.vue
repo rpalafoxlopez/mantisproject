@@ -148,6 +148,16 @@ const router = useRouter()
 
 const code = ref(route.query.code || localStorage.getItem('quizhive_player_code') || '')
 const playerName = ref(route.query.name || localStorage.getItem('quizhive_player_name') || '')
+
+// ═══════════════════════════════════════════════════════
+// ✅ FIX CRÍTICO: playerId persistente en localStorage
+// ═══════════════════════════════════════════════════════
+let playerId = localStorage.getItem('quizhive_player_id')
+if (!playerId) {
+  playerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
+  localStorage.setItem('quizhive_player_id', playerId)
+}
+
 const title = ref('')
 const questions = ref([])
 const totalQuestions = ref(0)
@@ -181,8 +191,9 @@ onMounted(() => {
   socket = io(API, {
     transports: ['websocket', 'polling'],
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 1000,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 2000,
     timeout: 10000
   })
 
@@ -190,13 +201,14 @@ onMounted(() => {
   // ✅ FIX 1: No resetear hasJoined en disconnect
   // ═══════════════════════════════════════════════════════
   socket.on('connect', () => {
-    console.log('✅ Socket conectado, uniendo al quiz...')
+    console.log('✅ Socket conectado:', socket.id)
     connectionError.value = ''
     if (!hasJoined) {
       hasJoined = true
       socket.emit('player:join', {
         code: code.value,
-        name: playerName.value
+        name: playerName.value,
+        playerId: playerId  // ← Enviar playerId persistente
       })
     }
   })
@@ -265,7 +277,7 @@ onMounted(() => {
   // ═══════════════════════════════════════════════════════
   socket.on('disconnect', (reason) => {
     console.log('❌ Desconectado:', reason)
-    // hasJoined NO se resetea — el servidor maneja la reconexión
+    // hasJoined NO se resetea — el servidor maneja la reconexión con playerId
   })
 
   // Timeout de seguridad
@@ -278,7 +290,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (socket) socket.disconnect()
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
 })
 
 function selectOption(idx) {
@@ -328,21 +343,19 @@ function finishQuiz() {
 function goHome() {
   localStorage.removeItem('quizhive_player_code')
   localStorage.removeItem('quizhive_player_name')
+  // No eliminar playerId — se reutiliza en futuras sesiones
+  hasJoined = false
   router.push('/')
 }
 
 function handleNext() {
-  // Si hay opción seleccionada pero no confirmada, confirmar primero
   if (selectedOption.value !== null && !showAnswerFeedback.value) {
     submitAnswer()
-    // Esperar un momento para que se vea el feedback antes de avanzar
     setTimeout(() => {
       goToQuestion(currentQuestion.value + 1)
     }, 1200)
     return
   }
-
-  // Si ya confirmó o no seleccionó nada, solo avanzar
   goToQuestion(currentQuestion.value + 1)
 }
 </script>

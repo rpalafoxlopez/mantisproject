@@ -10,6 +10,7 @@ import HostView       from '../views/HostView.vue'
 import JoinView       from '../views/JoinView.vue'
 import PlayView       from '../views/PlayView.vue'
 import ResultsView    from '../views/ResultsView.vue'
+import ScoreAnalytics from '../views/ScoreAnalytics.vue'
 
 const routes = [
   { path: '/', name: 'home', component: HomeView },
@@ -19,6 +20,7 @@ const routes = [
   { path: '/admin', name: 'admin', component: AdminView, meta: { title: 'Editor de Quiz — QuizHive', requiresAuth: true } },
   { path: '/host', name: 'host', component: HostView, meta: { title: 'Host — QuizHive' } },
   { path: '/join', name: 'join', component: JoinView, meta: { title: 'Unirse — QuizHive', hideNav: true } },
+  { path: '/score', name: 'score', component: ScoreAnalytics, meta: { title: 'Puntaje — QuizHive', hideNav: true } },
   { path: '/play', name: 'play', component: PlayView, meta: { title: 'Jugar — QuizHive', hideNav: true } },
   { path: '/results', name: 'results', component: ResultsView, meta: { title: 'Resultados — QuizHive', hideNav: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
