@@ -63,6 +63,7 @@
                 <button class="menu-btn" @click="toggleMenu(s.code)">⋯</button>
                 <div v-if="openMenu === s.code" class="dropdown">
                   <button @click="goToEdit(s.code)">✏️ Editar</button>
+                  <button @click="viewAnalytics(s)">📊 Ver Estadísticas</button>
                   <button @click="startSession(s.code)" :disabled="s.status !== 'waiting' || !s.questions.length">▶️ Iniciar</button>
                   <button class="danger" @click="confirmDelete(s)">🗑 Eliminar</button>
                 </div>
@@ -119,6 +120,13 @@
     </Transition>
 
     <div v-if="openMenu" class="click-outside" @click="openMenu = null" />
+
+     <QuizAnalyticsModal
+      :show="showAnalyticsModal"
+      :quiz="selectedQuiz"
+      @close="showAnalyticsModal = false"
+      @deleted="onQuizDeleted"
+    />
   </div>
 </template>
 
@@ -126,6 +134,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
+import QuizAnalyticsModal from './QuizAnalyticsModal.vue'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const router = useRouter()
@@ -143,6 +152,9 @@ const createError = ref('')
 const titleInput = ref(null)
 const deleteTarget = ref(null)
 const deleting = ref(false)
+
+const showAnalyticsModal = ref(false)
+const selectedQuiz = ref(null)
 
 const filters = [
   { label: 'Todos', value: 'all' },
@@ -219,6 +231,19 @@ async function copyCode(code) {
 function statusLabel(s) { return { waiting: 'En espera', active: 'En juego', finished: 'Finalizado' }[s] ?? s }
 function statusColor(s) { return { waiting: '#16a34a', active: '#f59e0b', finished: '#9ca3af' }[s] ?? '#6b7280' }
 function formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }) }
+
+function viewAnalytics(quiz) {
+  selectedQuiz.value = quiz
+  showAnalyticsModal.value = true
+  openMenu.value = null
+}
+
+function onQuizDeleted(code) {
+  sessions.value = sessions.value.filter(s => s.code !== code)
+  showAnalyticsModal.value = false
+  selectedQuiz.value = null
+}
+
 </script>
 
 <style scoped>
@@ -321,4 +346,37 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .cards-enter-from { opacity: 0; transform: translateY(10px); }
 .cards-leave-to { opacity: 0; transform: scale(.95); }
 @media (max-width: 768px) { .sidebar { display: none; } .main { padding: 1rem; } .topbar { flex-direction: column; align-items: flex-start; gap: .75rem; } .filters { flex-direction: column; align-items: stretch; } .search-wrap { max-width: 100%; } }
+
+.card-stats-extra {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.btn-analytics {
+  background: linear-gradient(135deg, #00d4aa, #00a8e8);
+  border: none;
+  color: #0f0f1a;
+  border-radius: 6px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-analytics:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3);
+}
+
+.card-footer {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: center;
+}
 </style>

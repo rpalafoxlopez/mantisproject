@@ -92,13 +92,7 @@
           </div>
         </div>
 
-        <!-- 🆕 NUEVO: Analytics de puntajes -->
-        <ScoreAnalytics 
-          :players="players"
-          :total-questions="questionCount"
-          :score-history="scoreHistory"
-        />
-
+     
         <!-- PREGUNTAS DEL QUIZ -->
         <div v-if="questions.length" class="questions-section">
           <h2><span class="material-icons">quiz</span> Preguntas ({{ questions.length }})</h2>
@@ -190,7 +184,6 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 import axios from 'axios'
-import ScoreAnalytics from './ScoreAnalytics.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,7 +195,6 @@ const sessionTitle = ref('')
 const questions = ref([])
 const questionCount = ref(0)
 const players = ref([])
-const scoreHistory = ref([])
 const copied = ref(false)
 const showFinalResults = ref(false)
 const finalResults = ref({ 

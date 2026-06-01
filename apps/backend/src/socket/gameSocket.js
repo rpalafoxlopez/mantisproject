@@ -248,6 +248,13 @@ export function setupGameSocket(io) {
       }
     });
 
+    io.to(cleanCode).emit('leaderboard:live', {
+      leaderboard: session.players
+        .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 10)
+    });
+
     socket.on('player:requestResults', async ({ code }) => {
       try {
         const session = await Session.findOne({ code: code.toUpperCase() });
