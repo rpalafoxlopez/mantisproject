@@ -29,12 +29,8 @@
           </div>
           <div class="share-bar">
             <span class="share-label">Compartir:</span>
-            <button class="btn-share-icon btn-whatsapp" @click="shareWhatsApp" title="WhatsApp">
-             
-            </button>
-            <button class="btn-share-icon btn-telegram" @click="shareTelegram" title="Telegram">
-             
-            </button>
+            <button class="btn-share-icon btn-whatsapp" @click="shareWhatsApp" title="WhatsApp">📱</button>
+            <button class="btn-share-icon btn-telegram" @click="shareTelegram" title="Telegram">✈️</button>
             <button class="btn-share-icon" @click="copyLink" title="Copiar link">
               <span class="material-icons">link</span>
             </button>
@@ -58,7 +54,25 @@
           </div>
         </div>
 
-        <!-- LISTA DE JUGADORES CON PROGRESO -->
+        <!-- LIVE LEADERBOARD -->
+        <div v-if="liveLeaderboard.length > 0" class="live-leaderboard-section">
+          <h2><span class="material-icons">emoji_events</span> Leaderboard en Vivo</h2>
+          <div class="live-lb-list">
+            <div
+              v-for="(player, i) in liveLeaderboard"
+              :key="player.name"
+              class="live-lb-row"
+              :class="{ 'top3': i < 3 }"
+            >
+              <span class="live-lb-rank">{{ i + 1 }}</span>
+              <span class="live-lb-name">{{ player.name }}</span>
+              <span class="live-lb-progress">{{ player.totalAnswered }}/{{ questionCount }}</span>
+              <span class="live-lb-score">⭐ {{ player.score }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- LISTA DE JUGADORES CON PROGRESO DETALLADO -->
         <div class="players-section">
           <div class="players-header">
             <h2><span class="material-icons">group</span> Jugadores ({{ players.length }})</h2>
@@ -72,7 +86,7 @@
             </div>
             <div
               v-for="(player, i) in sortedPlayers"
-              :key="player.name"
+              :key="player.name + i"
               class="player-row"
               :class="{ 'top3': i < 3 }"
             >
@@ -193,6 +207,7 @@ const players = ref([])
 const copied = ref(false)
 const showFinalResults = ref(false)
 const finalResults = ref({ leaderboard: [], totalPlayers: 0, totalQuestions: 0 })
+const liveLeaderboard = ref([])
 
 const socket = ref(null)
 
@@ -232,24 +247,33 @@ onMounted(async () => {
     console.error('Error fetching session:', err)
   }
 
-  // Conectar socket
   socket.value = io(API_URL, {
     transports: ['websocket', 'polling'],
     reconnection: true
   })
 
   socket.value.on('connect', () => {
+    console.log('✅ Host socket conectado')
     socket.value.emit('host:join', { code })
   })
 
   socket.value.on('host:joined', ({ title, questionCount: qc, players: p }) => {
+    console.log('✅ Host unido:', title, 'Players:', p?.length)
     sessionTitle.value = title
     questionCount.value = qc
     players.value = p || []
   })
 
+  // ESCUCHAR ACTUALIZACIONES EN VIVO
   socket.value.on('players:update', ({ players: p }) => {
+    console.log('📥 players:update recibido:', p?.length, 'jugadores')
     players.value = p || []
+  })
+
+  // ESCUCHAR LEADERBOARD EN VIVO
+  socket.value.on('leaderboard:live', ({ leaderboard: lb }) => {
+    console.log('📥 leaderboard:live recibido:', lb?.length, 'jugadores')
+    liveLeaderboard.value = lb || []
   })
 
   socket.value.on('quiz:finalResults', ({ title, leaderboard, totalQuestions, totalPlayers }) => {
@@ -329,9 +353,7 @@ function shareTelegram() {
 .copy-feedback { display: block; margin-top: 0.5rem; color: #00d4aa; font-size: 0.9rem; }
 .share-bar { display: flex; align-items: center; justify-content: center; gap: 0.5rem; margin: 1rem 0; }
 .share-label { color: #888; font-size: 0.9rem; margin-right: 0.5rem; }
-.btn-share-icon { width: 40px; height: 40px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-.btn-share-icon img { width: 20px; height: 20px; }
-.btn-share-icon .material-icons { font-size: 20px; }
+.btn-share-icon { width: 40px; height: 40px; border-radius: 10px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; font-size: 1.2rem; }
 .btn-whatsapp { background: #25d366; color: #fff; }
 .btn-whatsapp:hover { background: #1ebe57; transform: scale(1.1); }
 .btn-telegram { background: #0088cc; color: #fff; }
@@ -345,6 +367,17 @@ function shareTelegram() {
 .stat-card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1rem; text-align: center; }
 .stat-value { display: block; font-size: 1.75rem; font-weight: 700; color: #00d4aa; }
 .stat-label { color: #888; font-size: 0.8rem; }
+
+/* LIVE LEADERBOARD */
+.live-leaderboard-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.5rem; }
+.live-leaderboard-section h2 { display: flex; align-items: center; gap: 0.5rem; font-size: 1.1rem; color: #fff; margin-bottom: 1rem; }
+.live-lb-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.live-lb-row { display: grid; grid-template-columns: 40px 1fr 80px 80px; gap: 0.75rem; padding: 0.6rem 0.75rem; background: rgba(0,0,0,0.2); border-radius: 8px; align-items: center; }
+.live-lb-row.top3 { background: rgba(0,212,170,0.1); border: 1px solid rgba(0,212,170,0.2); }
+.live-lb-rank { font-weight: 700; color: #888; }
+.live-lb-name { color: #ddd; font-weight: 500; }
+.live-lb-progress { color: #888; font-size: 0.8rem; text-align: center; }
+.live-lb-score { font-weight: 700; color: #00d4aa; text-align: right; }
 
 .players-section { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.5rem; }
 .players-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
@@ -408,7 +441,7 @@ function shareTelegram() {
   .lobby-view, .final-results-view { padding: 1rem; }
   .code-text { font-size: 1.75rem; letter-spacing: 3px; }
   .live-stats-host { grid-template-columns: 1fr; }
-  .table-header, .player-row { grid-template-columns: 30px 1fr 100px 50px; }
+  .table-header, .player-row, .live-lb-row { grid-template-columns: 30px 1fr 80px 50px; }
   .progress-bar-mini { width: 50px; }
   .podium { flex-direction: column; align-items: center; }
   .podium-item.place-1 { order: 1; transform: none; }
