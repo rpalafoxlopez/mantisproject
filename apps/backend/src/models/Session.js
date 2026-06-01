@@ -21,6 +21,15 @@ const QuestionSchema = new mongoose.Schema({
   timeLimit: { type: Number, default: 20, min: 5, max: 120 }
 });
 
+const PlayerAnswerSchema = new mongoose.Schema({
+  questionIndex: { type: Number, required: true },
+  answerIndex: { type: Number, required: true },
+  isCorrect: { type: Boolean, required: true },
+  timeUsed: { type: Number, default: 0 },
+  pts: { type: Number, default: 0 },
+  answeredAt: { type: Date, default: Date.now }
+}, { _id: false });
+
 const PlayerSchema = new mongoose.Schema({
   socketId: { type: String, required: true },
   playerId: { type: String, required: true, default: () => 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11) },
