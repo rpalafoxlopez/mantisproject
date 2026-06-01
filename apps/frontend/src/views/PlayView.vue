@@ -1,4 +1,4 @@
-<<template>
+<template>
   <div class="play-view">
     <header class="play-header">
       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
@@ -63,23 +63,6 @@
               <span v-else>❌ Incorrecto. La correcta era {{ ['A','B','C','D','E','F'][correctIndex] }}</span>
             </div>
 
-            <!-- MINI LEADERBOARD EN VIVO -->
-            <div v-if="liveLeaderboard.length > 0" class="mini-leaderboard">
-              <h4>🏆 En vivo — Top 5</h4>
-              <div class="mini-lb-list">
-                <div
-                  v-for="(player, i) in liveLeaderboard"
-                  :key="player.name"
-                  class="mini-lb-row"
-                  :class="{ 'is-me': player.name === playerName }"
-                >
-                  <span class="mini-pos">{{ i + 1 }}</span>
-                  <span class="mini-name">{{ player.name }}</span>
-                  <span class="mini-score">⭐ {{ player.score }}</span>
-                </div>
-              </div>
-            </div>
-
             <div class="nav-buttons">
               <button
                 v-if="currentQuestion > 0"
@@ -93,7 +76,7 @@
                 class="btn-nav primary"
                 @click="handleNext"
               >
-                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
+                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
               </button>
               <button
                 v-else-if="answeredCount === totalQuestions"
@@ -107,7 +90,7 @@
                 class="btn-nav"
                 @click="handleNext"
               >
-                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
+                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
               </button>
             </div>
           </div>
@@ -123,7 +106,7 @@
 
       <!-- RESULTADOS FINALES -->
       <section v-else class="results-card">
-        <h2>🏆 Resultados Finales</h2>
+        <h2>🏆 Resultados</h2>
 
         <div class="personal-stats">
           <div class="stat-big">
@@ -182,7 +165,6 @@ const correctCount = ref(0)
 const leaderboard = ref([])
 const showResults = ref(false)
 const connectionError = ref('')
-const liveLeaderboard = ref([])
 
 const answeredCount = computed(() => Object.keys(answers.value).length)
 
@@ -204,6 +186,9 @@ onMounted(() => {
     timeout: 10000
   })
 
+  // ═══════════════════════════════════════════════════════
+  // ✅ FIX 1: No resetear hasJoined en disconnect
+  // ═══════════════════════════════════════════════════════
   socket.on('connect', () => {
     console.log('✅ Socket conectado, uniendo al quiz...')
     connectionError.value = ''
@@ -248,11 +233,6 @@ onMounted(() => {
     if (isCorrect) correctCount.value++
   })
 
-  // 🆕 ESCUCHAR LEADERBOARD EN VIVO
-  socket.on('leaderboard:live', ({ leaderboard: lb }) => {
-    liveLeaderboard.value = lb || []
-  })
-
   socket.on('quiz:personalResults', ({
     yourScore, yourRank, totalPlayers: tp, correctCount: cc,
     totalQuestions: tq, leaderboard: lb
@@ -280,10 +260,15 @@ onMounted(() => {
     connectionError.value = 'Error de conexión con el servidor'
   })
 
+  // ═══════════════════════════════════════════════════════
+  // ✅ FIX 1: No resetear hasJoined en disconnect
+  // ═══════════════════════════════════════════════════════
   socket.on('disconnect', (reason) => {
     console.log('❌ Desconectado:', reason)
+    // hasJoined NO se resetea — el servidor maneja la reconexión
   })
 
+  // Timeout de seguridad
   setTimeout(() => {
     if (questions.value.length === 0 && !connectionError.value) {
       console.log('⏱️ Timeout esperando respuesta del servidor')
@@ -329,22 +314,11 @@ function goToQuestion(idx) {
       showAnswerFeedback.value = true
       lastAnswerCorrect.value = prev.isCorrect
       lastPoints.value = prev.points
-      correctIndex.value = questions.value[idx].options.findIndex((o, i) =>
+      correctIndex.value = questions.value[idx].options.findIndex((o, i) => 
         questions.value[idx].options[i]?.isCorrect
       )
     }
   }
-}
-
-function handleNext() {
-  if (selectedOption.value !== null && !showAnswerFeedback.value) {
-    submitAnswer()
-    setTimeout(() => {
-      goToQuestion(currentQuestion.value + 1)
-    }, 1200)
-    return
-  }
-  goToQuestion(currentQuestion.value + 1)
 }
 
 function finishQuiz() {
@@ -355,6 +329,21 @@ function goHome() {
   localStorage.removeItem('quizhive_player_code')
   localStorage.removeItem('quizhive_player_name')
   router.push('/')
+}
+
+function handleNext() {
+  // Si hay opción seleccionada pero no confirmada, confirmar primero
+  if (selectedOption.value !== null && !showAnswerFeedback.value) {
+    submitAnswer()
+    // Esperar un momento para que se vea el feedback antes de avanzar
+    setTimeout(() => {
+      goToQuestion(currentQuestion.value + 1)
+    }, 1200)
+    return
+  }
+
+  // Si ya confirmó o no seleccionó nada, solo avanzar
+  goToQuestion(currentQuestion.value + 1)
 }
 </script>
 
@@ -401,16 +390,6 @@ function goHome() {
 .feedback-banner { padding: 1rem; border-radius: 8px; text-align: center; font-weight: 600; }
 .feedback-banner.correct { background: #dcfce7; color: #166534; }
 .feedback-banner:not(.correct) { background: #fef2f2; color: #991b1b; }
-
-/* 🆕 MINI LEADERBOARD EN VIVO */
-.mini-leaderboard { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .75rem 1rem; }
-.mini-leaderboard h4 { margin: 0 0 .5rem; font-size: .85rem; color: #64748b; text-align: center; }
-.mini-lb-list { display: flex; flex-direction: column; gap: .3rem; }
-.mini-lb-row { display: flex; align-items: center; gap: .5rem; padding: .3rem .5rem; border-radius: 4px; font-size: .85rem; }
-.mini-lb-row.is-me { background: #f0fdf4; font-weight: 600; }
-.mini-pos { width: 1.5rem; text-align: center; color: #64748b; }
-.mini-name { flex: 1; }
-.mini-score { color: #16a34a; font-weight: 600; }
 
 .nav-buttons { display: flex; gap: .5rem; justify-content: space-between; }
 .btn-nav { padding: .6rem 1.2rem; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-weight: 500; }

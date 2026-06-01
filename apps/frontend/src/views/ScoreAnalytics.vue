@@ -146,69 +146,97 @@ const topPlayer = computed(() => {
   return [...props.players].sort((a, b) => (b.score || 0) - (a.score || 0))[0]
 })
 
-// Distribución de rendimiento
+// Distribución de rendimiento (usando avgPerQuestion del backend)
 const highPerfPercentage = computed(() => {
-  const count = props.players.filter(p => p.avgPerQuestion >= 140).length
-  return (count / props.players.length) * 100 || 0
+  const count = props.players.filter(p => (p.avgPerQuestion || 0) >= 140).length
+  return props.players.length ? (count / props.players.length) * 100 : 0
 })
 
 const midPerfPercentage = computed(() => {
-  const count = props.players.filter(p => p.avgPerQuestion >= 80 && p.avgPerQuestion < 140).length
-  return (count / props.players.length) * 100 || 0
+  const count = props.players.filter(p => {
+    const avg = p.avgPerQuestion || 0
+    return avg >= 80 && avg < 140
+  }).length
+  return props.players.length ? (count / props.players.length) * 100 : 0
 })
 
 const lowPerfPercentage = computed(() => {
-  const count = props.players.filter(p => p.avgPerQuestion < 80).length
-  return (count / props.players.length) * 100 || 0
+  const count = props.players.filter(p => (p.avgPerQuestion || 0) < 80).length
+  return props.players.length ? (count / props.players.length) * 100 : 0
 })
 
-// Top players para gráfico
+// Construir progresión de puntajes desde scoreHistory
 const topPlayersByScore = computed(() => {
   return [...props.players]
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, 5)
-    .map(p => ({
-      ...p,
-      scoreProgression: p.scoreProgression || []
-    }))
+    .map(p => {
+      // Extraer progresión del historial
+      const progression = []
+      props.scoreHistory.forEach(snapshot => {
+        const snapshotPlayer = snapshot.players.find(sp => sp.name === p.name)
+        if (snapshotPlayer) progression.push(snapshotPlayer.score || 0)
+      })
+      return {
+        ...p,
+        scoreProgression: progression.length ? progression : [p.score || 0]
+      }
+    })
 })
 
-// Players con estadísticas completas
+// Players con estadísticas completas (datos ya vienen del backend)
 const playersWithStats = computed(() => {
   return props.players.map(player => ({
     ...player,
     correctCount: player.correctCount || 0,
     bonusCount: player.bonusCount || 0,
-    avgPerQuestion: player.totalAnswered ? Math.round(player.score / player.totalAnswered) : 0,
+    avgPerQuestion: player.avgPerQuestion || (player.totalAnswered ? Math.round((player.score || 0) / player.totalAnswered) : 0),
     currentStreak: player.currentStreak || 0
   })).sort((a, b) => (b.score || 0) - (a.score || 0))
 })
 
 // Alertas de rendimiento
 const alerts = ref([])
+let lastAlertedScores = {}
 
 // Monitorear cambios en jugadores para generar alertas
 watch(() => props.players, (newPlayers, oldPlayers) => {
-  if (!oldPlayers) return
-  
+  if (!oldPlayers || !oldPlayers.length) {
+    // Inicializar tracking
+    newPlayers.forEach(p => { lastAlertedScores[p.name] = p.score || 0 })
+    return
+  }
+
   newPlayers.forEach(player => {
     const oldPlayer = oldPlayers.find(p => p.name === player.name)
-    if (oldPlayer && player.score > oldPlayer.score) {
-      const pointsGained = player.score - oldPlayer.score
-      if (pointsGained === 150) {
-        addAlert('success', `🎯 ${player.name} respondió con BONUS MÁXIMO! +150 pts`)
-      } else if (pointsGained === 100) {
-        addAlert('info', `📝 ${player.name} respuesta correcta +100 pts`)
-      } else if (pointsGained === 0 && oldPlayer.score === player.score) {
-        addAlert('warning', `❌ ${player.name} falló la pregunta`)
+    if (!oldPlayer) {
+      // Nuevo jugador
+      addAlert('info', `🎮 ${player.name} se unió al quiz`)
+      lastAlertedScores[player.name] = player.score || 0
+      return
+    }
+
+    const prevScore = lastAlertedScores[player.name] || oldPlayer.score || 0
+    const newScore = player.score || 0
+
+    if (newScore > prevScore) {
+      const pointsGained = newScore - prevScore
+      if (pointsGained >= 150) {
+        addAlert('success', `🎯 ${player.name} respondió con BONUS MÁXIMO! +${pointsGained} pts`)
+      } else if (pointsGained >= 100) {
+        addAlert('info', `✅ ${player.name} respuesta correcta +${pointsGained} pts`)
+      } else if (pointsGained > 0) {
+        addAlert('info', `📝 ${player.name} +${pointsGained} pts`)
       }
+      lastAlertedScores[player.name] = newScore
     }
   })
 }, { deep: true })
 
 function addAlert(type, message) {
+  const id = Date.now() + Math.random()
   alerts.value.unshift({
-    id: Date.now(),
+    id,
     type,
     message,
     icon: type === 'success' ? '🎉' : type === 'info' ? '✅' : '⚠️',
@@ -216,11 +244,11 @@ function addAlert(type, message) {
   })
   // Mantener solo últimas 10 alertas
   if (alerts.value.length > 10) alerts.value.pop()
-  
-  // Auto-limpiar después de 5 segundos
+
+  // Auto-limpiar después de 8 segundos
   setTimeout(() => {
-    alerts.value = alerts.value.filter(a => a.id !== Date.now())
-  }, 5000)
+    alerts.value = alerts.value.filter(a => a.id !== id)
+  }, 8000)
 }
 </script>
 
@@ -554,15 +582,15 @@ tr.is-leader {
   .analytics-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .chart-bars {
     flex-direction: column;
   }
-  
+
   .player-chart {
     min-width: 100%;
   }
-  
+
   .bars-container {
     height: 80px;
   }

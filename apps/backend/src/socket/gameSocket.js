@@ -1,6 +1,18 @@
 import Session from '../models/Session.js';
 import { calculateScore } from '../utils/helpers.js';
 
+function calculateCurrentStreak(answers) {
+  let streak = 0;
+  for (let i = answers.length - 1; i >= 0; i--) {
+    if (answers[i].isCorrect) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
 export function setupGameSocket(io) {
   io.on('connection', (socket) => {
     console.log('🔌 Cliente conectado:', socket.id);
@@ -58,6 +70,9 @@ export function setupGameSocket(io) {
     });
 
     // ========== PLAYER ==========
+    // ═══════════════════════════════════════════════════════
+    // ✅ FIX 2: Mejorar reconexión en player:join
+    // ═══════════════════════════════════════════════════════
     socket.on('player:join', async ({ code, name }) => {
       try {
         const cleanCode = code.toUpperCase().trim();
@@ -72,15 +87,17 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Código de partida inválido.' });
         }
 
+        // 🔄 FIX: Migrar sesiones viejas 'waiting' → 'active'
         if (session.status === 'waiting') {
           session.status = 'active';
+          console.log(`🔄 Migrando sesión ${cleanCode}: waiting → active`);
         }
 
         if (session.status === 'finished') {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
 
-        // 🧹 Limpiar zombies
+        // 🧹 Limpiar zombies PRIMERO (incluyendo el propio socket si existe de antes)
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
         const originalCount = session.players?.length || 0;
 
@@ -96,29 +113,39 @@ export function setupGameSocket(io) {
           console.log(`🧹 Limpiados ${originalCount - session.players.length} zombies`);
         }
 
-        // 🔄 Manejar reconexión
-        const existingIndex = (session.players || []).findIndex(p => p.name === cleanName);
-
-        if (existingIndex !== -1) {
-          const existing = session.players[existingIndex];
-          const oldSocket = io.sockets.sockets.get(existing.socketId);
-
-          if (oldSocket && oldSocket.connected && existing.socketId !== socket.id) {
-            console.log(`🚫 Rechazado: ${cleanName} ya está conectado con otro socket`);
-            return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
-          }
-
-          console.log(`🔄 Reconectando: ${cleanName} (${existing.socketId} → ${socket.id})`);
-          session.players[existingIndex].socketId = socket.id;
+        // 🔄 Manejar reconexión: verificar si este socket ya está registrado
+        const myOldEntry = session.players.find(p => p.socketId === socket.id);
+        if (myOldEntry) {
+          console.log(`🔄 Reconexión del mismo socket: ${cleanName}`);
+          // Ya está, solo actualizar datos del socket
         } else {
-          console.log(`✅ Nuevo: ${cleanName}`);
-          if (!session.players) session.players = [];
-          session.players.push({
-            socketId: socket.id,
-            name: cleanName,
-            score: 0,
-            answers: []
-          });
+          // Verificar si el nombre ya existe con socket vivo
+          const existingIndex = (session.players || []).findIndex(p => p.name === cleanName);
+
+          if (existingIndex !== -1) {
+            const existing = session.players[existingIndex];
+            const oldSocket = io.sockets.sockets.get(existing.socketId);
+
+            // Si el socket anterior está vivo Y es diferente al actual → rechazar
+            if (oldSocket && oldSocket.connected && existing.socketId !== socket.id) {
+              console.log(`🚫 Rechazado: ${cleanName} ya está conectado con otro socket (${existing.socketId})`);
+              return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
+            }
+
+            // Reemplazar socketId (reconexión del mismo navegador con nuevo socket)
+            console.log(`🔄 Reconectando: ${cleanName} (${existing.socketId} → ${socket.id})`);
+            session.players[existingIndex].socketId = socket.id;
+          } else {
+            // Nuevo jugador
+            console.log(`✅ Nuevo: ${cleanName}`);
+            if (!session.players) session.players = [];
+            session.players.push({
+              socketId: socket.id,
+              name: cleanName,
+              score: 0,
+              answers: []
+            });
+          }
         }
 
         await session.save();
@@ -128,35 +155,32 @@ export function setupGameSocket(io) {
         socket.data.code = cleanCode;
         socket.data.name = cleanName;
 
-        // Enviar TODAS las preguntas al jugador
+        // Enviar preguntas
         socket.emit('player:joined', {
           name: cleanName,
           code: cleanCode,
           title: session.title,
-          questions: session.questions.map(q => ({
+          questions: (session.questions || []).map(q => ({
             text: q.text,
-            options: q.options.map(o => ({ text: o.text })),
-            timeLimit: q.timeLimit
+            options: (q.options || []).map(o => ({ text: o.text })),
+            timeLimit: q.timeLimit || 20
           })),
-          totalQuestions: session.questions.length
+          totalQuestions: (session.questions || []).length
         });
 
-        // Notificar a todos en la sala
-        const playersUpdate = session.players.map(p => ({
-          name: p.name,
-          score: p.score,
-          totalAnswered: p.answers.length
-        }));
-
-        io.to(cleanCode).emit('players:update', { players: playersUpdate });
-
-        // 🆕 ENVIAR LEADERBOARD INICIAL
-        const initialLeaderboard = [...playersUpdate].sort((a, b) => b.score - a.score).slice(0, 10);
-        io.to(cleanCode).emit('leaderboard:live', { leaderboard: initialLeaderboard });
+        // 🔄 Emitir players:update a TODOS en la sala (incluyendo el host)
+        io.to(cleanCode).emit('players:update', {
+          players: (session.players || []).map(p => ({
+            name: p.name,
+            score: p.score || 0,
+            totalAnswered: (p.answers || []).length
+          }))
+        });
 
       } catch (err) {
-        console.error('❌ player:join error:', err);
-        socket.emit('error', { message: 'Error al unirse a la partida.' });
+        console.error('❌ player:join ERROR COMPLETO:', err);
+        console.error('Stack:', err.stack);
+        socket.emit('error', { message: 'Error al unirse: ' + err.message });
       }
     });
 
@@ -201,17 +225,21 @@ export function setupGameSocket(io) {
           correctIndex: question.options.findIndex(o => o.isCorrect)
         });
 
-        // 🆕 ACTUALIZAR LEADERBOARD EN VIVO
-        const playersUpdate = session.players.map(p => ({
-          name: p.name,
-          score: p.score,
-          totalAnswered: p.answers.length
-        }));
-
-        const liveLeaderboard = [...playersUpdate].sort((a, b) => b.score - a.score).slice(0, 10);
-
-        io.to(cleanCode).emit('players:update', { players: playersUpdate });
-        io.to(cleanCode).emit('leaderboard:live', { leaderboard: liveLeaderboard });
+        // ═══════════════════════════════════════════════════════
+        // ✅ FIX: players:update con streak, bonus y correctCount
+        // ═══════════════════════════════════════════════════════
+        io.to(cleanCode).emit('players:update', {
+          players: session.players
+            .map(p => ({
+              name: p.name,
+              score: p.score || 0,
+              totalAnswered: (p.answers || []).length,
+              correctCount: (p.answers || []).filter(a => a.isCorrect).length,
+              bonusCount: (p.answers || []).filter(a => a.pts === 150).length,
+              currentStreak: calculateCurrentStreak(p.answers || [])
+            }))
+            .sort((a, b) => b.score - a.score)
+        });
 
       } catch (err) {
         socket.emit('error', { message: err.message });
@@ -274,16 +302,13 @@ export function setupGameSocket(io) {
           );
 
           const updated = await Session.findOne({ code: socket.data.code });
-          const playersUpdate = updated?.players.map(p => ({
-            name: p.name,
-            score: p.score,
-            totalAnswered: p.answers.length
-          })) || [];
-
-          io.to(socket.data.code).emit('players:update', { players: playersUpdate });
-
-          const liveLeaderboard = [...playersUpdate].sort((a, b) => b.score - a.score).slice(0, 10);
-          io.to(socket.data.code).emit('leaderboard:live', { leaderboard: liveLeaderboard });
+          io.to(socket.data.code).emit('players:update', {
+            players: updated?.players.map(p => ({
+              name: p.name,
+              score: p.score,
+              totalAnswered: p.answers.length
+            })) || []
+          });
 
           console.log(`🗑️ Eliminado tras grace period: ${socket.data.name || socket.id}`);
         } catch (err) {
