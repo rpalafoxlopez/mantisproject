@@ -190,7 +190,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { io } from 'socket.io-client'
 import axios from 'axios'
-import ScoreAnalytics from '@/components/ScoreAnalytics.vue'
+import ScoreAnalytics from './ScoreAnalytics.vue'
 
 const route = useRoute()
 const router = useRouter()
