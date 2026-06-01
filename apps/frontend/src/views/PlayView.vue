@@ -1,25 +1,22 @@
 <template>
   <div class="play-view">
-     <header class="play-header">
+    <header class="play-header">
       <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
       <div class="progress-info">
         <span class="score">⭐ {{ myScore }} pts</span>
         <span class="answered-count">{{ answeredCount }}/{{ totalQuestions }}</span>
       </div>
-      <!-- 🆕 Botón de recarga manual -->
       <button v-if="connectionError" class="btn-reload" @click="forcePageRefresh">
         🔄 Recargar
       </button>
     </header>
 
-    <!-- Mostrar mensaje de reintento -->
     <div v-if="isRetrying" class="retry-banner">
       <div class="spinner-small"></div>
       <span>Reconectando... Intento {{ sessionRetryCount }}/{{ maxRetries }}</span>
     </div>
 
     <main class="play-main">
-      <!-- QUIZ EN PROGRESO -->
       <section v-if="!showResults && questions.length > 0" class="quiz-container">
         <div class="question-nav">
           <button
@@ -74,50 +71,31 @@
             </div>
 
             <div class="nav-buttons">
-              <button
-                v-if="currentQuestion > 0"
-                class="btn-nav"
-                @click="goToQuestion(currentQuestion - 1)"
-              >
+              <button v-if="currentQuestion > 0" class="btn-nav" @click="goToQuestion(currentQuestion - 1)">
                 ← Anterior
               </button>
-              <button
-                v-if="currentQuestion < questions.length - 1"
-                class="btn-nav primary"
-                @click="handleNext"
-              >
-                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
+              <button v-if="currentQuestion < questions.length - 1" class="btn-nav primary" @click="handleNext">
+                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Siguiente →' }}
               </button>
-              <button
-                v-else-if="answeredCount === totalQuestions"
-                class="btn-finish"
-                @click="finishQuiz"
-              >
+              <button v-else-if="answeredCount === totalQuestions" class="btn-finish" @click="finishQuiz">
                 🏆 Ver resultados
               </button>
-              <button
-                v-else
-                class="btn-nav"
-                @click="handleNext"
-              >
-                 {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
+              <button v-else class="btn-nav" @click="handleNext">
+                {{ selectedOption !== null && !showAnswerFeedback ? 'Confirmar y siguiente →' : 'Saltar a pendiente →' }}
               </button>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- CARGANDO -->
       <section v-else-if="!showResults && questions.length === 0" class="card loading-card">
         <div class="spinner-big"></div>
         <h2>Conectando al quiz…</h2>
         <p class="subtitle">Espera un momento</p>
       </section>
 
-      <!-- RESULTADOS FINALES -->
       <section v-else class="results-card">
         <h2>🏆 Resultados</h2>
-
         <div class="personal-stats">
           <div class="stat-big">
             <span class="rank">#{{ personalRank }}</span>
@@ -126,21 +104,15 @@
           <div class="score-big">⭐ {{ myScore }} puntos</div>
           <div class="detail">{{ correctCount }}/{{ totalQuestions }} correctas</div>
         </div>
-
         <h3>Top 10</h3>
         <ol class="leaderboard">
-          <li
-            v-for="(player, idx) in leaderboard"
-            :key="idx"
-            :class="{ 'is-you': player.name === playerName }"
-          >
+          <li v-for="(player, idx) in leaderboard" :key="idx" :class="{ 'is-you': player.name === playerName }">
             <span class="pos">{{ idx + 1 }}</span>
             <span class="name">{{ player.name }}</span>
             <span class="correct">{{ player.correctCount }}/{{ totalQuestions }}</span>
             <span class="score">⭐ {{ player.score }}</span>
           </li>
         </ol>
-
         <button class="btn-home" @click="goHome">← Volver al inicio</button>
       </section>
     </main>
@@ -156,29 +128,18 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const route = useRoute()
 const router = useRouter()
 
+// Datos del jugador
 const code = ref(route.query.code || localStorage.getItem('quizhive_player_code') || '')
 const playerName = ref(route.query.name || localStorage.getItem('quizhive_player_name') || '')
-// ═══════════════════════════════════════════════════════
-// 🆕 MEJORA: playerId con limpieza forzada
-// ═══════════════════════════════════════════════════════
-const sessionRetryCount = ref(0)
-const maxRetries = 3
 
-if (!playerId) {
-  playerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
-  localStorage.setItem('quizhive_player_id', playerId)
-}
-let reconnectTimer = null
-
-// ═══════════════════════════════════════════════════════
-// ✅ FIX CRÍTICO: playerId persistente en localStorage
-// ═══════════════════════════════════════════════════════
+// playerId persistente - UNA SOLA DECLARACIÓN
 let playerId = localStorage.getItem('quizhive_player_id')
 if (!playerId) {
   playerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
   localStorage.setItem('quizhive_player_id', playerId)
 }
 
+// Estado del juego
 const title = ref('')
 const questions = ref([])
 const totalQuestions = ref(0)
@@ -196,190 +157,26 @@ const correctCount = ref(0)
 const leaderboard = ref([])
 const showResults = ref(false)
 const connectionError = ref('')
+const isRetrying = ref(false)
+const sessionRetryCount = ref(0)
+const maxRetries = 3
 
 const answeredCount = computed(() => Object.keys(answers.value).length)
 
 let socket = null
 let questionStartTime = 0
 let hasJoined = false
+let reconnectTimer = null
 
-onMounted(() => {
-  if (!code.value || !playerName.value) {
-    router.push('/join')
-    return
-  }
-
-  socket = io(API, {
-    transports: ['websocket', 'polling'],
-    reconnection: true,
-    reconnectionAttempts: 10,
-    reconnectionDelay: 500,
-    reconnectionDelayMax: 2000,
-    timeout: 10000
-  })
-
-  // ═══════════════════════════════════════════════════════
-  // ✅ FIX 1: No resetear hasJoined en disconnect
-  // ═══════════════════════════════════════════════════════
-  socket.on('connect', () => {
-    console.log('✅ Socket conectado:', socket.id)
-    connectionError.value = ''
-    if (!hasJoined) {
-      hasJoined = true
-      socket.emit('player:join', {
-        code: code.value,
-        name: playerName.value,
-        playerId: playerId  // ← Enviar playerId persistente
-      })
-    }
-  })
-
-  socket.on('player:joined', ({ title: t, questions: q, totalQuestions: total }) => {
-    console.log('✅ Unido al quiz:', t, 'Preguntas:', q?.length)
-    title.value = t
-    questions.value = q || []
-    totalQuestions.value = total || (q ? q.length : 0)
-    currentQuestion.value = 0
-    selectedOption.value = null
-    answers.value = {}
-    showAnswerFeedback.value = false
-    showResults.value = false
-    myScore.value = 0
-    correctCount.value = 0
-    connectionError.value = ''
-    questionStartTime = Date.now()
-  })
-
-  socket.on('answer:confirmed', ({ questionIndex, isCorrect, points, yourScore, correctIndex: ci }) => {
-    lastAnswerCorrect.value = isCorrect
-    lastPoints.value = points
-    correctIndex.value = ci
-    myScore.value = yourScore
-    showAnswerFeedback.value = true
-
-    answers.value[questionIndex] = {
-      answerIndex: selectedOption.value,
-      isCorrect,
-      points
-    }
-
-    if (isCorrect) correctCount.value++
-  })
-
-  socket.on('quiz:personalResults', ({
-    yourScore, yourRank, totalPlayers: tp, correctCount: cc,
-    totalQuestions: tq, leaderboard: lb
-  }) => {
-    myScore.value = yourScore
-    personalRank.value = yourRank
-    totalPlayers.value = tp
-    correctCount.value = cc
-    totalQuestions.value = tq
-    leaderboard.value = lb
-    showResults.value = true
-  })
-
-  socket.on('error', ({ message }) => {
-    console.log('❌ Socket error:', message)
-    connectionError.value = message
-    if (message.includes('terminó') || message.includes('inválido') || message.includes('encontrada')) {
-      alert(message)
-      router.push('/join')
-    }
-  })
-
-  socket.on('connect_error', (err) => {
-    console.log('❌ Connect error:', err.message)
-    connectionError.value = 'Error de conexión con el servidor'
-  })
-
-  // ═══════════════════════════════════════════════════════
-  // ✅ FIX 1: No resetear hasJoined en disconnect
-  // ═══════════════════════════════════════════════════════
-  socket.on('disconnect', (reason) => {
-    console.log('❌ Desconectado:', reason)
-    // hasJoined NO se resetea — el servidor maneja la reconexión con playerId
-  })
-
-  // Timeout de seguridad
-  setTimeout(() => {
-    if (questions.value.length === 0 && !connectionError.value) {
-      console.log('⏱️ Timeout esperando respuesta del servidor')
-      connectionError.value = 'El servidor no respondió. Intenta recargar la página.'
-    }
-  }, 10000)
-})
-
-onUnmounted(() => {
-  if (socket) {
-    socket.disconnect()
-    socket = null
-  }
-})
-
-function selectOption(idx) {
-  if (!showAnswerFeedback.value) {
-    selectedOption.value = idx
-  }
+// Función para recargar la página
+function forcePageRefresh() {
+  console.log('🔄 Forzando recarga de página...')
+  localStorage.setItem('quizhive_player_code', code.value)
+  localStorage.setItem('quizhive_player_name', playerName.value)
+  window.location.reload()
 }
 
-function submitAnswer() {
-  if (selectedOption.value === null || showAnswerFeedback.value) return
-
-  const timeUsed = Math.floor((Date.now() - questionStartTime) / 1000)
-
-  socket.emit('player:answer', {
-    code: code.value,
-    questionIndex: currentQuestion.value,
-    answerIndex: selectedOption.value,
-    timeUsed
-  })
-}
-
-function goToQuestion(idx) {
-  if (idx >= 0 && idx < questions.value.length) {
-    currentQuestion.value = idx
-    selectedOption.value = null
-    showAnswerFeedback.value = false
-    correctIndex.value = -1
-    questionStartTime = Date.now()
-
-    const prev = answers.value[idx]
-    if (prev) {
-      selectedOption.value = prev.answerIndex
-      showAnswerFeedback.value = true
-      lastAnswerCorrect.value = prev.isCorrect
-      lastPoints.value = prev.points
-      correctIndex.value = questions.value[idx].options.findIndex((o, i) => 
-        questions.value[idx].options[i]?.isCorrect
-      )
-    }
-  }
-}
-
-function finishQuiz() {
-  socket.emit('player:requestResults', { code: code.value })
-}
-
-function goHome() {
-  localStorage.removeItem('quizhive_player_code')
-  localStorage.removeItem('quizhive_player_name')
-  // No eliminar playerId — se reutiliza en futuras sesiones
-  hasJoined = false
-  router.push('/')
-}
-
-function handleNext() {
-  if (selectedOption.value !== null && !showAnswerFeedback.value) {
-    submitAnswer()
-    setTimeout(() => {
-      goToQuestion(currentQuestion.value + 1)
-    }, 1200)
-    return
-  }
-  goToQuestion(currentQuestion.value + 1)
-}
-
+// Función para reiniciar conexión
 function resetAndRetry() {
   if (isRetrying.value) return
   
@@ -388,43 +185,26 @@ function resetAndRetry() {
   
   console.log(`🔄 Intento de reconexión ${sessionRetryCount.value}/${maxRetries}`)
   
-  // Limpiar socket anterior
   if (socket) {
     socket.disconnect()
     socket = null
   }
   
-  // Limpiar localStorage temporalmente
-  const savedPlayerId = localStorage.getItem('quizhive_player_id')
-  const savedCode = localStorage.getItem('quizhive_player_code')
-  const savedName = localStorage.getItem('quizhive_player_name')
-  
-  // Generar nuevo playerId para este intento
+  // Generar nuevo playerId
   const newPlayerId = 'pid_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11)
   localStorage.setItem('quizhive_player_id', newPlayerId)
   playerId = newPlayerId
   
   hasJoined = false
   
-  // Pequeño delay antes de reconectar
   setTimeout(() => {
     isRetrying.value = false
-    initializeConnection()
+    initSocket()
   }, 1000)
 }
 
-// 🆕 Función para refrescar la página (último recurso)
-function forcePageRefresh() {
-  console.log('🔄 Forzando recarga de página...')
-  // Guardar datos actuales
-  localStorage.setItem('quizhive_player_code', code.value)
-  localStorage.setItem('quizhive_player_name', playerName.value)
-  // Recargar página
-  window.location.reload()
-}
-
-// 🆕 Función para inicializar conexión
-function initializeConnection() {
+// Inicializar socket
+function initSocket() {
   if (socket) {
     socket.disconnect()
     socket = null
@@ -435,7 +215,6 @@ function initializeConnection() {
     reconnection: true,
     reconnectionAttempts: 10,
     reconnectionDelay: 500,
-    reconnectionDelayMax: 2000,
     timeout: 10000
   })
 
@@ -453,8 +232,7 @@ function initializeConnection() {
   })
 
   socket.on('player:joined', ({ title: t, questions: q, totalQuestions: total }) => {
-    console.log('✅ Unido al quiz:', t, 'Preguntas:', q?.length)
-    // Limpiar contador de reintentos al conectar exitosamente
+    console.log('✅ Unido al quiz:', t)
     sessionRetryCount.value = 0
     title.value = t
     questions.value = q || []
@@ -486,10 +264,7 @@ function initializeConnection() {
     if (isCorrect) correctCount.value++
   })
 
-  socket.on('quiz:personalResults', ({
-    yourScore, yourRank, totalPlayers: tp, correctCount: cc,
-    totalQuestions: tq, leaderboard: lb
-  }) => {
+  socket.on('quiz:personalResults', ({ yourScore, yourRank, totalPlayers: tp, correctCount: cc, totalQuestions: tq, leaderboard: lb }) => {
     myScore.value = yourScore
     personalRank.value = yourRank
     totalPlayers.value = tp
@@ -499,19 +274,16 @@ function initializeConnection() {
     showResults.value = true
   })
 
-  // 🆕 Manejo específico del error "nombre en uso"
   socket.on('error', ({ message }) => {
     console.log('❌ Socket error:', message)
     connectionError.value = message
     
     if (message.includes('nombre ya está en uso')) {
       if (sessionRetryCount.value < maxRetries) {
-        // Intentar reconectar con nuevo ID
-        console.log('🔄 Nombre en uso, reintentando con nuevo ID...')
+        console.log('🔄 Nombre en uso, reintentando...')
         resetAndRetry()
       } else {
-        // Si falla después de varios intentos, mostrar mensaje y ofrecer recargar
-        alert(`No se pudo conectar. Por favor, recarga la página o cambia tu nombre.\n\nError: ${message}`)
+        alert(`No se pudo conectar. Por favor, recarga la página.\n\nError: ${message}`)
         if (confirm('¿Quieres recargar la página?')) {
           forcePageRefresh()
         }
@@ -532,31 +304,7 @@ function initializeConnection() {
   })
 }
 
-onMounted(() => {
-  if (!code.value || !playerName.value) {
-    router.push('/join')
-    return
-  }
-  
-  initializeConnection()
-
-  // Timeout de seguridad
-  setTimeout(() => {
-    if (questions.value.length === 0 && !connectionError.value && !isRetrying.value) {
-      console.log('⏱️ Timeout esperando respuesta del servidor')
-      connectionError.value = 'El servidor no respondió. Intenta recargar la página.'
-    }
-  }, 10000)
-})
-
-onUnmounted(() => {
-  if (reconnectTimer) clearTimeout(reconnectTimer)
-  if (socket) {
-    socket.disconnect()
-    socket = null
-  }
-})
-
+// Funciones del juego
 function selectOption(idx) {
   if (!showAnswerFeedback.value) {
     selectedOption.value = idx
@@ -590,9 +338,10 @@ function goToQuestion(idx) {
       showAnswerFeedback.value = true
       lastAnswerCorrect.value = prev.isCorrect
       lastPoints.value = prev.points
-      correctIndex.value = questions.value[idx].options.findIndex((o, i) => 
-        questions.value[idx].options[i]?.isCorrect
-      )
+      const currentQ = questions.value[idx]
+      if (currentQ && currentQ.options) {
+        correctIndex.value = currentQ.options.findIndex(o => o?.isCorrect === true)
+      }
     }
   }
 }
@@ -602,10 +351,9 @@ function finishQuiz() {
 }
 
 function goHome() {
-  // Limpiar todo al salir
   localStorage.removeItem('quizhive_player_code')
   localStorage.removeItem('quizhive_player_name')
-  localStorage.removeItem('quizhive_player_id') // También limpiar playerId
+  localStorage.removeItem('quizhive_player_id')
   hasJoined = false
   if (socket) socket.disconnect()
   router.push('/')
@@ -622,12 +370,36 @@ function handleNext() {
   goToQuestion(currentQuestion.value + 1)
 }
 
-// 🆕 Función manual para recargar
+// Ciclo de vida
+onMounted(() => {
+  if (!code.value || !playerName.value) {
+    router.push('/join')
+    return
+  }
+  
+  initSocket()
+
+  setTimeout(() => {
+    if (questions.value.length === 0 && !connectionError.value && !isRetrying.value) {
+      console.log('⏱️ Timeout esperando respuesta')
+      connectionError.value = 'El servidor no respondió. Intenta recargar.'
+    }
+  }, 10000)
+})
+
+onUnmounted(() => {
+  if (reconnectTimer) clearTimeout(reconnectTimer)
+  if (socket) {
+    socket.disconnect()
+    socket = null
+  }
+})
+
+// Exponer función global para debugging
 window.forceReload = forcePageRefresh
 </script>
 
 <style scoped>
-/* Agregar estos estilos */
 .btn-reload {
   background: #f59e0b;
   color: #fff;
@@ -670,6 +442,7 @@ window.forceReload = forcePageRefresh
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 }
+
 .play-view { min-height: 100vh; background: #f8fafc; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 .play-header { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
 .progress-info { display: flex; gap: 1.5rem; align-items: center; }
