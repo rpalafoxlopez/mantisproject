@@ -29,14 +29,6 @@ const PlayerSchema = new mongoose.Schema({
   answers: { type: [PlayerAnswerSchema], default: [] }
 }, { _id: false });
 
-const PlayerSchema = new mongoose.Schema({
-  socketId: { type: String, required: true },
-  playerId: { type: String, required: true },
-  name: { type: String, required: true, trim: true },
-  score: { type: Number, default: 0 },
-  answers: { type: [PlayerAnswerSchema], default: [] }
-}, { _id: false });
-
 const SessionSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, uppercase: true, trim: true },
   title: { type: String, required: true, trim: true, maxlength: 100 },
