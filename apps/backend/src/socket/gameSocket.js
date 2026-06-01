@@ -78,9 +78,6 @@ export function setupGameSocket(io) {
     });
 
     // ========== PLAYER ==========
-    // ═══════════════════════════════════════════════════════
-    // ✅ FIX DEFINITIVO: playerId persistente + reconexión robusta
-    // ═══════════════════════════════════════════════════════
     socket.on('player:join', async ({ code, name, playerId }) => {
       try {
         const cleanCode = code.toUpperCase().trim();
@@ -105,60 +102,38 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
 
-        // 🧹 Limpiar zombies: sockets que ya no están conectados
+        // Limpiar zombies
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
         const originalCount = session.players?.length || 0;
 
         if (session.players && session.players.length > 0) {
           session.players = session.players.filter(p => {
             const isAlive = connectedSocketIds.includes(p.socketId);
-            if (!isAlive) console.log(`🧹 Zombie eliminado: ${p.name} (socket: ${p.socketId})`);
+            if (!isAlive) console.log(`🧹 Zombie eliminado: ${p.name}`);
             return isAlive;
           });
         }
 
-        if ((session.players?.length || 0) < originalCount) {
-          console.log(`🧹 Limpiados ${originalCount - session.players.length} zombies de ${originalCount}`);
-        }
-
-        // 🔍 DEBUG
-        console.log(`🔍 [${cleanCode}] Intentando unir: "${cleanName}" playerId: ${persistentId}`);
-        console.log(`🔍 Jugadores actuales:`, session.players?.map(p => ({ name: p.name, playerId: p.playerId, socketId: p.socketId })) || []);
-
-        // 🔄 ESTRATEGIA DE RECONEXIÓN:
-        // 1. Buscar por playerId (mismo navegador, recarga)
-        // 2. Buscar por nombre (navegador diferente, mismo nombre)
-        // 3. Nuevo jugador
-
+        // Buscar por playerId o nombre
         const existingById = session.players?.findIndex(p => p.playerId === persistentId);
         const existingByName = session.players?.findIndex(p => p.name === cleanName);
 
         if (existingById !== -1 && existingById !== undefined) {
-          // Mismo navegador recargó → actualizar socketId
-          const oldSocketId = session.players[existingById].socketId;
-          console.log(`🔄 Reconexión por playerId: ${cleanName} (socket ${oldSocketId} → ${socket.id})`);
+          console.log(`🔄 Reconexión por playerId: ${cleanName}`);
           session.players[existingById].socketId = socket.id;
-          session.players[existingById].name = cleanName;
         } else if (existingByName !== -1 && existingByName !== undefined) {
-          // Mismo nombre, diferente navegador → verificar si el socket viejo sigue vivo
           const existing = session.players[existingByName];
           const oldSocket = io.sockets.sockets.get(existing.socketId);
 
-          console.log(`🔍 Nombre "${cleanName}" existe. Socket guardado: ${existing.socketId}`);
-          console.log(`🔍 oldSocket existe: ${!!oldSocket}, connected: ${oldSocket?.connected}`);
-
           if (oldSocket && oldSocket.connected) {
-            console.log(`🚫 RECHAZADO: ${cleanName} ya conectado con socket ${existing.socketId}`);
             return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
           }
 
-          // Socket muerto → reemplazar
-          console.log(`🔄 Reconectando por nombre: ${cleanName} (socket ${existing.socketId} → ${socket.id})`);
+          console.log(`🔄 Reconectando por nombre: ${cleanName}`);
           session.players[existingByName].socketId = socket.id;
           session.players[existingByName].playerId = persistentId;
         } else {
-          // Nuevo jugador
-          console.log(`✅ Nuevo jugador: ${cleanName} (playerId: ${persistentId}, socket: ${socket.id})`);
+          console.log(`✅ Nuevo jugador: ${cleanName}`);
           if (!session.players) session.players = [];
           session.players.push({
             socketId: socket.id,
@@ -191,6 +166,14 @@ export function setupGameSocket(io) {
 
         io.to(cleanCode).emit('players:update', {
           players: buildPlayerUpdate(session.players)
+        });
+
+        // Leaderboard inicial
+        io.to(cleanCode).emit('leaderboard:live', {
+          leaderboard: session.players
+            .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10)
         });
 
       } catch (err) {
@@ -243,16 +226,17 @@ export function setupGameSocket(io) {
           players: buildPlayerUpdate(session.players)
         });
 
+        io.to(cleanCode).emit('leaderboard:live', {
+          leaderboard: session.players
+            .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 10)
+        });
+
       } catch (err) {
+        console.error('❌ player:answer error:', err);
         socket.emit('error', { message: err.message });
       }
-    });
-
-    io.to(cleanCode).emit('leaderboard:live', {
-      leaderboard: session.players
-        .map(p => ({ name: p.name, score: p.score, totalAnswered: p.answers.length }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 10)
     });
 
     socket.on('player:requestResults', async ({ code }) => {
@@ -293,9 +277,6 @@ export function setupGameSocket(io) {
     });
 
     // ========== DISCONNECT ==========
-    // ═══════════════════════════════════════════════════════
-    // ✅ FIX: Grace period reducido + playerId para reconexión rápida
-    // ═══════════════════════════════════════════════════════
     socket.on('disconnect', async (reason) => {
       console.log('🔌 Desconectado:', socket.id, 'Razón:', reason);
       if (!socket.data.code) return;
@@ -307,20 +288,12 @@ export function setupGameSocket(io) {
           const session = await Session.findOne({ code: socket.data.code });
           if (!session) return;
 
-          // Verificar si el jugador se reconectó con otro socket (mismo playerId)
           const reconnected = session.players.find(p => 
             p.playerId === socket.data.playerId && p.socketId !== socket.id
           );
 
           if (reconnected) {
-            console.log(`🔄 ${socket.data.name} reconectado con nuevo socket, no eliminar`);
-            return;
-          }
-
-          // Verificar si el socket original sigue en la lista
-          const stillThere = session.players.find(p => p.socketId === socket.id);
-          if (!stillThere) {
-            console.log(`🗑️ ${socket.data.name} ya fue eliminado`);
+            console.log(`🔄 ${socket.data.name} reconectado`);
             return;
           }
 
@@ -334,9 +307,9 @@ export function setupGameSocket(io) {
             players: buildPlayerUpdate(updated?.players)
           });
 
-          console.log(`🗑️ Eliminado tras grace period: ${socket.data.name || socket.id}`);
+          console.log(`🗑️ Eliminado: ${socket.data.name || socket.id}`);
         } catch (err) {
-          console.error('❌ disconnect cleanup error:', err);
+          console.error('❌ disconnect error:', err);
         }
       }, gracePeriod);
     });
