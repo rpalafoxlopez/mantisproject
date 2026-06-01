@@ -73,7 +73,8 @@ export function setupGameSocket(io) {
     // ═══════════════════════════════════════════════════════
     // ✅ FIX 2: Mejorar reconexión en player:join
     // ═══════════════════════════════════════════════════════
-    socket.on('player:join', async ({ code, name }) => {
+   // REEMPLAZA el handler de player:join en gameSocket.js con ESTO:
+   socket.on('player:join', async ({ code, name }) => {
       try {
         const cleanCode = code.toUpperCase().trim();
         const cleanName = name.trim();
@@ -87,7 +88,6 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Código de partida inválido.' });
         }
 
-        // 🔄 FIX: Migrar sesiones viejas 'waiting' → 'active'
         if (session.status === 'waiting') {
           session.status = 'active';
           console.log(`🔄 Migrando sesión ${cleanCode}: waiting → active`);
@@ -97,47 +97,57 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
 
-        // 🧹 Limpiar zombies PRIMERO (incluyendo el propio socket si existe de antes)
+        // 🧹 Limpiar zombies PRIMERO
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
         const originalCount = session.players?.length || 0;
 
         if (session.players && session.players.length > 0) {
           session.players = session.players.filter(p => {
             const isAlive = connectedSocketIds.includes(p.socketId);
-            if (!isAlive) console.log(`🧹 Zombie: ${p.name}`);
+            if (!isAlive) console.log(`🧹 Zombie eliminado: ${p.name} (${p.socketId})`);
             return isAlive;
           });
         }
 
         if ((session.players?.length || 0) < originalCount) {
-          console.log(`🧹 Limpiados ${originalCount - session.players.length} zombies`);
+          console.log(`🧹 Limpiados ${originalCount - session.players.length} zombies de ${originalCount}`);
         }
 
-        // 🔄 Manejar reconexión: verificar si este socket ya está registrado
+        // 🔍 DEBUG: Mostrar estado actual
+        console.log(`🔍 [${cleanCode}] Buscando nombre: "${cleanName}"`);
+        console.log(`🔍 Jugadores actuales:`, session.players?.map(p => ({ name: p.name, socketId: p.socketId })) || []);
+
+        // 🔄 Verificar si este socket YA está registrado (reconexión del mismo socket)
         const myOldEntry = session.players.find(p => p.socketId === socket.id);
         if (myOldEntry) {
-          console.log(`🔄 Reconexión del mismo socket: ${cleanName}`);
-          // Ya está, solo actualizar datos del socket
+          console.log(`🔄 Reconexión del MISMO socket: ${cleanName} (socket.id: ${socket.id})`);
+          // Ya está registrado con este socket, no hacer nada más
         } else {
-          // Verificar si el nombre ya existe con socket vivo
+          // Buscar si el nombre ya existe
           const existingIndex = (session.players || []).findIndex(p => p.name === cleanName);
-
+          
           if (existingIndex !== -1) {
             const existing = session.players[existingIndex];
             const oldSocket = io.sockets.sockets.get(existing.socketId);
+            
+            console.log(`🔍 Nombre "${cleanName}" encontrado. socketId guardado: ${existing.socketId}`);
+            console.log(`🔍 oldSocket existe: ${!!oldSocket}`);
+            console.log(`🔍 oldSocket.connected: ${oldSocket?.connected}`);
+            console.log(`🔍 socket.id actual: ${socket.id}`);
+            console.log(`🔍 ¿Son diferentes?: ${existing.socketId !== socket.id}`);
 
             // Si el socket anterior está vivo Y es diferente al actual → rechazar
             if (oldSocket && oldSocket.connected && existing.socketId !== socket.id) {
-              console.log(`🚫 Rechazado: ${cleanName} ya está conectado con otro socket (${existing.socketId})`);
+              console.log(`🚫 RECHAZADO: ${cleanName} ya está conectado con socket ${existing.socketId}`);
               return socket.emit('error', { message: 'Ese nombre ya está en uso.' });
             }
-
-            // Reemplazar socketId (reconexión del mismo navegador con nuevo socket)
-            console.log(`🔄 Reconectando: ${cleanName} (${existing.socketId} → ${socket.id})`);
+            
+            // Si el socket anterior está muerto O es el mismo navegador con nuevo socket → reemplazar
+            console.log(`🔄 Reconectando: ${cleanName} (viejo: ${existing.socketId} → nuevo: ${socket.id})`);
             session.players[existingIndex].socketId = socket.id;
           } else {
             // Nuevo jugador
-            console.log(`✅ Nuevo: ${cleanName}`);
+            console.log(`✅ Nuevo jugador: ${cleanName} (socket: ${socket.id})`);
             if (!session.players) session.players = [];
             session.players.push({
               socketId: socket.id,
@@ -155,7 +165,6 @@ export function setupGameSocket(io) {
         socket.data.code = cleanCode;
         socket.data.name = cleanName;
 
-        // Enviar preguntas
         socket.emit('player:joined', {
           name: cleanName,
           code: cleanCode,
@@ -168,7 +177,6 @@ export function setupGameSocket(io) {
           totalQuestions: (session.questions || []).length
         });
 
-        // 🔄 Emitir players:update a TODOS en la sala (incluyendo el host)
         io.to(cleanCode).emit('players:update', {
           players: (session.players || []).map(p => ({
             name: p.name,
@@ -178,8 +186,7 @@ export function setupGameSocket(io) {
         });
 
       } catch (err) {
-        console.error('❌ player:join ERROR COMPLETO:', err);
-        console.error('Stack:', err.stack);
+        console.error('❌ player:join ERROR:', err);
         socket.emit('error', { message: 'Error al unirse: ' + err.message });
       }
     });
@@ -316,5 +323,24 @@ export function setupGameSocket(io) {
         }
       }, 5000);
     });
+
+    function calculateStreak(answers) {
+        let streak = 0
+        for (let i = answers.length - 1; i >= 0; i--) {
+          if (answers[i].isCorrect) streak++
+          else break
+        }
+        return streak
+      }
+
+      // En 'player:answer' y 'player:join', enviar métricas enriquecidas
+      const playersUpdate = session.players.map(p => ({
+        name: p.name,
+        score: p.score,
+        totalAnswered: p.answers.length,
+        correctCount: p.answers.filter(a => a.isCorrect).length,
+        bonusCount: p.answers.filter(a => a.pts === 150).length,
+        currentStreak: calculateStreak(p.answers)
+      }))
   });
 }
