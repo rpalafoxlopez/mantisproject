@@ -1,9 +1,9 @@
 <template>
   <div class="dashboard">
     <aside class="sidebar">
-      <div class="sidebar-logo">
+      <!-- <div class="sidebar-logo">
         <span class="logo"><img src="/img/quizhive.png" width="120" alt="QuizHive Logo"></span>
-      </div>
+      </div> -->
       <nav class="sidebar-nav">
         <router-link to="/dashboard" class="nav-item active">
           <span class="nav-icon">📋</span> Mis Quizzes
