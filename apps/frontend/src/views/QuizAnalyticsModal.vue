@@ -145,6 +145,7 @@
       <div class="modal-container small">
         <div class="modal-header">
           <h2>⚠️ Eliminar Quiz</h2>
+          <button class="close-btn" @click="showDeleteConfirm = false">×</button>
         </div>
         <div class="modal-body">
           <p>¿Estás seguro de que quieres eliminar <strong>{{ quiz?.title }}</strong>?</p>
@@ -208,7 +209,6 @@ const topPlayers = computed(() => {
     }))
 })
 
-// Distribución de rendimiento
 const highPerfPercentage = computed(() => {
   if (!quizData.value?.players?.length) return 0
   const count = quizData.value.players.filter(p => {
@@ -236,12 +236,10 @@ const lowPerfPercentage = computed(() => {
   return (count / quizData.value.players.length) * 100
 })
 
-// Progresión de puntajes para gráfico
 const scoreHistory = ref([])
 const topPlayersByProgression = computed(() => {
   if (!scoreHistory.value.length) return []
 
-  // Obtener top 5 jugadores
   const top5 = [...quizData.value.players]
     .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, 5)
@@ -259,11 +257,8 @@ const topPlayersByProgression = computed(() => {
   })
 })
 
-// Construir historial desde respuestas
 function buildScoreHistory(players, totalQuestions) {
   if (!players || !players.length) return []
-
-  // Crear snapshots por pregunta respondida
   const history = []
   for (let q = 0; q < totalQuestions; q++) {
     const snapshotPlayers = players.map(p => {
@@ -284,7 +279,6 @@ watch(() => props.show, async (newVal) => {
     try {
       const res = await axios.get(`${API}/api/sessions/${props.quiz.code}`)
       quizData.value = res.data
-      // Construir historial de puntajes
       scoreHistory.value = buildScoreHistory(quizData.value.players, quizData.value.questions?.length || 0)
     } catch (err) {
       console.error('Error loading quiz data:', err)
@@ -331,7 +325,7 @@ async function deleteQuiz() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -340,14 +334,13 @@ async function deleteQuiz() {
 }
 
 .modal-container {
-  background: linear-gradient(135deg, #1e293b, #0f172a);
-  border-radius: 20px;
+  background: #ffffff;
+  border-radius: 24px;
   width: 100%;
   max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
-  border: 1px solid rgba(0, 212, 170, 0.3);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
 }
 
 .modal-container.small {
@@ -359,14 +352,16 @@ async function deleteQuiz() {
   justify-content: space-between;
   align-items: center;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafafa;
+  border-radius: 24px 24px 0 0;
 }
 
 .modal-header h2 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #00d4aa;
+  color: #059669;
   font-size: 1.25rem;
   margin: 0;
 }
@@ -374,15 +369,22 @@ async function deleteQuiz() {
 .close-btn {
   background: none;
   border: none;
-  color: #94a3b8;
+  color: #6b7280;
   font-size: 1.75rem;
   cursor: pointer;
   padding: 0;
   line-height: 1;
   transition: color 0.2s;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
 }
 
 .close-btn:hover {
+  background: #f3f4f6;
   color: #ef4444;
 }
 
@@ -396,14 +398,14 @@ async function deleteQuiz() {
 .loading-state {
   text-align: center;
   padding: 3rem;
-  color: #94a3b8;
+  color: #6b7280;
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(0, 212, 170, 0.2);
-  border-top-color: #00d4aa;
+  border: 3px solid #d1fae5;
+  border-top-color: #059669;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   margin: 0 auto 1rem;
@@ -421,36 +423,46 @@ async function deleteQuiz() {
 }
 
 .summary-card {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
   padding: 1rem;
   text-align: center;
+  transition: all 0.2s;
+}
+
+.summary-card:hover {
+  border-color: #059669;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.1);
 }
 
 .summary-value {
   display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #00d4aa;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #059669;
 }
 
 .summary-label {
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 /* Analytics Sections */
 .analytics-section h3 {
-  color: #fff;
+  color: #1f2937;
   font-size: 0.9rem;
   margin-bottom: 1rem;
+  font-weight: 600;
 }
 
 /* Top Players Table */
 .top-players-table {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
   overflow: hidden;
 }
 
@@ -459,37 +471,43 @@ async function deleteQuiz() {
   display: grid;
   grid-template-columns: 40px 1fr 80px 80px 60px;
   gap: 0.5rem;
-  padding: 0.6rem 1rem;
+  padding: 0.75rem 1rem;
 }
 
 .table-header {
-  background: rgba(0, 212, 170, 0.1);
-  color: #94a3b8;
+  background: #f3f4f6;
+  color: #4b5563;
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .table-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
+  border-bottom: 1px solid #f3f4f6;
+  color: #374151;
   font-size: 0.85rem;
 }
 
-.table-row.top-three {
-  background: rgba(0, 212, 170, 0.05);
+.table-row:last-child {
+  border-bottom: none;
 }
 
-.rank { font-weight: 700; color: #00d4aa; }
-.name { font-weight: 500; }
-.score { color: #fbbf24; }
-.correct { color: #60a5fa; }
-.bonus { color: #f97316; }
+.table-row.top-three {
+  background: linear-gradient(90deg, rgba(5, 150, 105, 0.05), transparent);
+}
+
+.rank { font-weight: 700; color: #059669; }
+.name { font-weight: 500; color: #1f2937; }
+.score { color: #f59e0b; font-weight: 600; }
+.correct { color: #3b82f6; }
+.bonus { color: #ef4444; font-weight: 600; }
 
 /* Distribution */
 .distribution-container {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
+  background: #f9fafb;
+  border-radius: 16px;
   padding: 1rem;
+  border: 1px solid #e5e7eb;
 }
 
 .distribution-bars {
@@ -505,7 +523,7 @@ async function deleteQuiz() {
   align-items: center;
   justify-content: center;
   font-size: 0.7rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
   transition: width 0.3s ease;
 }
@@ -519,7 +537,7 @@ async function deleteQuiz() {
   gap: 1rem;
   justify-content: center;
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: #6b7280;
 }
 
 .dot {
@@ -538,8 +556,9 @@ async function deleteQuiz() {
 .evolution-chart {
   display: flex;
   gap: 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
   padding: 1rem;
   min-height: 200px;
 }
@@ -549,7 +568,7 @@ async function deleteQuiz() {
   flex-direction: column;
   justify-content: space-between;
   font-size: 0.7rem;
-  color: #64748b;
+  color: #6b7280;
   padding-right: 0.5rem;
 }
 
@@ -571,9 +590,10 @@ async function deleteQuiz() {
 
 .player-name {
   font-size: 0.7rem;
-  color: #94a3b8;
+  color: #4b5563;
   text-align: center;
   word-break: break-word;
+  font-weight: 600;
 }
 
 .bars-wrapper {
@@ -587,7 +607,7 @@ async function deleteQuiz() {
 
 .evolution-bar {
   flex: 1;
-  background: linear-gradient(180deg, #00d4aa, #00a8e8);
+  background: linear-gradient(180deg, #059669, #10b981);
   border-radius: 4px 4px 0 0;
   min-height: 4px;
   cursor: pointer;
@@ -596,7 +616,7 @@ async function deleteQuiz() {
 }
 
 .evolution-bar:hover {
-  background: #00ffd5;
+  background: linear-gradient(180deg, #10b981, #34d399);
   transform: scaleX(1.05);
 }
 
@@ -605,13 +625,14 @@ async function deleteQuiz() {
   bottom: 100%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
+  background: #1f2937;
   color: #fff;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.7rem;
   white-space: nowrap;
   display: none;
+  z-index: 10;
 }
 
 .evolution-bar:hover .tooltip {
@@ -624,12 +645,12 @@ async function deleteQuiz() {
   gap: 1rem;
   justify-content: flex-end;
   padding-top: 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #e5e7eb;
 }
 
 .btn-primary, .btn-secondary, .btn-danger {
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -637,34 +658,34 @@ async function deleteQuiz() {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #00d4aa, #00a8e8);
+  background: linear-gradient(135deg, #059669, #10b981);
   border: none;
-  color: #0f0f1a;
+  color: white;
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  color: #374151;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #e5e7eb;
 }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.2);
-  border: 1px solid rgba(239, 68, 68, 0.5);
-  color: #ef4444;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
 }
 
 .btn-danger:hover {
-  background: rgba(239, 68, 68, 0.4);
+  background: #fee2e2;
 }
 
 .warning-text {
@@ -673,6 +694,7 @@ async function deleteQuiz() {
   margin-top: 0.5rem;
 }
 
+/* Transiciones */
 .modal-enter-active, .modal-leave-active {
   transition: opacity 0.2s, transform 0.2s;
 }
