@@ -93,24 +93,23 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Código de partida inválido.' });
         }
 
-        if (session.status === 'waiting') {
-          session.status = 'active';
-          console.log(`🔄 Migrando sesión ${cleanCode}: waiting → active`);
-        }
-
         if (session.status === 'finished') {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
 
-        // Limpiar zombies
+        // Limpiar zombies: solo eliminar jugadores sin progreso (score 0, sin respuestas)
+        // que ya no tienen socket activo. Los jugadores con progreso se conservan siempre.
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
-        const originalCount = session.players?.length || 0;
 
         if (session.players && session.players.length > 0) {
           session.players = session.players.filter(p => {
             const isAlive = connectedSocketIds.includes(p.socketId);
-            if (!isAlive) console.log(`🧹 Zombie eliminado: ${p.name}`);
-            return isAlive;
+            const hasProgress = (p.score > 0) || (p.answers && p.answers.length > 0);
+            if (!isAlive && !hasProgress) {
+              console.log(`🧹 Zombie eliminado: ${p.name}`);
+              return false;
+            }
+            return true;
           });
         }
 

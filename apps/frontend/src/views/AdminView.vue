@@ -146,7 +146,7 @@ onMounted(async () => {
   if (codeFromUrl) { await loadSession(codeFromUrl.toUpperCase()); return }
   const saved = localStorage.getItem('quizhive_admin_code')
   if (saved) {
-    try { const { data } = await axios.get(`${API}/api/sessions/${saved}`); if (data.status === 'waiting') currentSession.value = data }
+    try { const { data } = await axios.get(`${API}/api/sessions/${saved}`); currentSession.value = data }
     catch { localStorage.removeItem('quizhive_admin_code') }
   }
 })

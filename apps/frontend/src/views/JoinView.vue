@@ -68,7 +68,7 @@ function joinQuiz() {
   joining.value = true
   error.value = ''
 
-  if (!socket || !socket.connected) {
+  if (!socket) {
     socket = io(API, {
       transports: ['websocket', 'polling'],
       reconnection: true,
@@ -100,17 +100,32 @@ function joinQuiz() {
     joining.value = false
   })
 
-  setTimeout(() => {
+  const timeoutId = setTimeout(() => {
     if (joining.value) {
       error.value = 'El servidor no respondió. Intenta de nuevo.'
       joining.value = false
     }
   }, 8000)
 
-  socket.emit('player:join', {
-    code: code.value.trim(),
-    name: name.value.trim()
-  })
+  const doEmit = () => {
+    clearTimeout(timeoutId)
+    setTimeout(() => {
+      if (joining.value) {
+        error.value = 'El servidor no respondió. Intenta de nuevo.'
+        joining.value = false
+      }
+    }, 8000)
+    socket.emit('player:join', {
+      code: code.value.trim(),
+      name: name.value.trim()
+    })
+  }
+
+  if (socket.connected) {
+    doEmit()
+  } else {
+    socket.once('connect', doEmit)
+  }
 }
 </script>
 

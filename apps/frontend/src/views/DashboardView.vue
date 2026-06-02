@@ -1,13 +1,27 @@
 <template>
   <div class="dashboard">
     <aside class="sidebar">
+      <div class="sidebar-logo">
+        <img src="/img/quizhive.png" width="110" alt="QuizHive" />
+      </div>
       <nav class="sidebar-nav">
-        <router-link to="/dashboard" class="nav-item active">
+        <router-link to="/dashboard" class="nav-item" :class="{ active: $route.path === '/dashboard' }">
           <span class="nav-icon">📋</span> Mis Quizzes
         </router-link>
-        <router-link to="/host" class="nav-item">
+        <router-link to="/host" class="nav-item" :class="{ active: $route.path === '/host' }">
           <span class="nav-icon">▶️</span> Iniciar partida
         </router-link>
+        <div class="nav-divider"></div>
+        <div class="nav-section-label">Estadísticas</div>
+        <button class="nav-item" @click="openStatsModal">
+          <span class="nav-icon">📊</span> Stats por Quiz
+        </button>
+        <button class="nav-item" @click="openTopUsersModal">
+          <span class="nav-icon">🏆</span> Top del mes
+        </button>
+        <button class="nav-item" @click="openHistoryModal">
+          <span class="nav-icon">📅</span> Historial
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="admin-chip">
@@ -187,6 +201,85 @@
       @close="showAnalyticsModal = false"
       @deleted="onQuizDeleted"
     />
+
+    <!-- Modal Stats por Quiz -->
+    <Transition name="modal">
+      <div v-if="showStatsModal" class="modal-overlay" @click.self="showStatsModal = false">
+        <div class="modal-card modal-wide">
+          <div class="modal-header">
+            <h2>📊 Estadísticas por Quiz</h2>
+            <button class="modal-close" @click="showStatsModal = false">×</button>
+          </div>
+          <div class="stats-table-wrap">
+            <table class="stats-table">
+              <thead><tr><th>Quiz</th><th>Código</th><th>Estado</th><th>Jugadores</th><th>Preguntas</th><th>Creado</th></tr></thead>
+              <tbody>
+                <tr v-for="s in sessions" :key="s.code">
+                  <td class="st-title">{{ s.title }}</td>
+                  <td><span class="code-mono">{{ s.code }}</span></td>
+                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '22', color: statusColor(s.status) }">{{ statusLabel(s.status) }}</span></td>
+                  <td>{{ s.players?.length || 0 }}</td>
+                  <td>{{ s.questions.length }}</td>
+                  <td>{{ formatDate(s.createdAt) }}</td>
+                </tr>
+                <tr v-if="!sessions.length"><td colspan="6" class="empty-row">No hay quizzes aún</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Modal Top del Mes -->
+    <Transition name="modal">
+      <div v-if="showTopUsersModal" class="modal-overlay" @click.self="showTopUsersModal = false">
+        <div class="modal-card modal-wide">
+          <div class="modal-header">
+            <h2>🏆 Top Jugadores del Mes</h2>
+            <button class="modal-close" @click="showTopUsersModal = false">×</button>
+          </div>
+          <div class="top-users-list">
+            <div v-if="topUsers.length === 0" class="empty-state" style="padding: 2rem">
+              <div class="empty-icon">🐝</div>
+              <p>No hay datos de jugadores aún.</p>
+            </div>
+            <div v-for="(u, i) in topUsers" :key="u.name" class="top-user-row">
+              <span class="top-rank" :class="{ gold: i===0, silver: i===1, bronze: i===2 }">{{ i+1 }}</span>
+              <span class="top-name">{{ u.name }}</span>
+              <span class="top-score">{{ u.score }} pts</span>
+              <span class="top-games">{{ u.games }} partidas</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Modal Historial -->
+    <Transition name="modal">
+      <div v-if="showHistoryModal" class="modal-overlay" @click.self="showHistoryModal = false">
+        <div class="modal-card modal-wide">
+          <div class="modal-header">
+            <h2>📅 Historial de Partidas</h2>
+            <button class="modal-close" @click="showHistoryModal = false">×</button>
+          </div>
+          <div class="stats-table-wrap">
+            <table class="stats-table">
+              <thead><tr><th>Quiz</th><th>Código</th><th>Estado</th><th>Jugadores</th><th>Fecha</th></tr></thead>
+              <tbody>
+                <tr v-for="s in sessionsHistory" :key="s.code">
+                  <td class="st-title">{{ s.title }}</td>
+                  <td><span class="code-mono">{{ s.code }}</span></td>
+                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '22', color: statusColor(s.status) }">{{ statusLabel(s.status) }}</span></td>
+                  <td>{{ s.players?.length || 0 }}</td>
+                  <td>{{ formatDate(s.createdAt) }}</td>
+                </tr>
+                <tr v-if="!sessionsHistory.length"><td colspan="5" class="empty-row">No hay historial aún</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -215,6 +308,15 @@ const deleting = ref(false)
 
 const showAnalyticsModal = ref(false)
 const selectedQuiz = ref(null)
+
+// Sidebar modals
+const showStatsModal = ref(false)
+const showTopUsersModal = ref(false)
+const showHistoryModal = ref(false)
+
+function openStatsModal() { showStatsModal.value = true }
+function openTopUsersModal() { showTopUsersModal.value = true }
+function openHistoryModal() { showHistoryModal.value = true }
 
 const filters = [
   { label: 'Todos', value: 'all' },
@@ -337,14 +439,35 @@ function onQuizDeleted(code) {
   showAnalyticsModal.value = false
   selectedQuiz.value = null
 }
+
+// Top users: aggregate across all sessions/players
+const topUsers = computed(() => {
+  const map = {}
+  sessions.value.forEach(s => {
+    (s.players || []).forEach(p => {
+      if (!map[p.name]) map[p.name] = { name: p.name, score: 0, games: 0 }
+      map[p.name].score += p.score || 0
+      map[p.name].games += 1
+    })
+  })
+  return Object.values(map).sort((a, b) => b.score - a.score).slice(0, 10)
+})
+
+// History: all sessions sorted by date desc
+const sessionsHistory = computed(() =>
+  [...sessions.value].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+)
 </script>
 
 <style scoped>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 .dashboard { display: flex; min-height: 100vh; background: #f8fafc; color: #1e293b; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
 .sidebar { width: 240px; background: #ffffff; border-right: 1px solid #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; position: sticky; top: 0; height: 100vh; }
-.sidebar-nav { flex: 1; padding: 1rem .6rem; display: flex; flex-direction: column; gap: .25rem; }
-.nav-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .8rem; border-radius: 8px; color: #64748b; text-decoration: none; font-size: .88rem; font-weight: 500; transition: background .15s, color .15s; }
+.sidebar-logo { padding: 1.25rem 1.2rem 0.5rem; border-bottom: 1px solid #f1f5f9; }
+.sidebar-nav { flex: 1; padding: 0.75rem .6rem; display: flex; flex-direction: column; gap: .2rem; overflow-y: auto; }
+.nav-divider { height: 1px; background: #f1f5f9; margin: .5rem .2rem; }
+.nav-section-label { font-size: .7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: .07rem; font-weight: 700; padding: .4rem .8rem .2rem; }
+.nav-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .8rem; border-radius: 8px; color: #64748b; text-decoration: none; font-size: .88rem; font-weight: 500; transition: background .15s, color .15s; background: transparent; border: none; cursor: pointer; width: 100%; text-align: left; }
 .nav-item:hover, .nav-item.active { background: #f0fdf4; color: #16a34a; }
 .nav-icon { font-size: .9rem; }
 .sidebar-footer { padding: 1rem 1.2rem; border-top: 1px solid #e2e8f0; }
