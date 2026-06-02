@@ -52,39 +52,71 @@
         <button v-if="!search" class="btn-new" @click="openCreateModal">+ Crear primer Quiz</button>
       </div>
 
-      <TransitionGroup v-else name="cards" tag="div" class="quiz-grid">
-        <div v-for="s in filtered" :key="s.code" class="quiz-card" :class="`status-${s.status}`">
-          <div class="card-accent" :style="{ background: statusColor(s.status) }" />
-          <div class="card-body">
-            <div class="card-header-row">
-              <span class="status-dot" :style="{ background: statusColor(s.status) }" />
-              <span class="status-label">{{ statusLabel(s.status) }}</span>
-              <div class="card-menu" @click.stop>
-                <button class="menu-btn" @click="toggleMenu(s.code)">⋯</button>
-                <div v-if="openMenu === s.code" class="dropdown">
-                  <button @click="goToEdit(s.code)">✏️ Editar</button>
-                  <button @click="viewAnalytics(s)">📊 Ver Estadísticas</button>
-                  <button @click="startSession(s.code)" :disabled="s.status !== 'waiting' || !s.questions.length">▶️ Iniciar</button>
-                  <button class="danger" @click="confirmDelete(s)">🗑 Eliminar</button>
-                </div>
-              </div>
-            </div>
-            <h2 class="card-title" @click="goToEdit(s.code)">{{ s.title }}</h2>
-            <div class="card-stats">
-              <div class="stat"><span class="stat-num">{{ s.questions.length }}</span><span class="stat-lbl">preguntas</span></div>
-              <div class="stat-divider" />
-              <div class="stat"><span class="stat-num code-mono">{{ s.code }}</span><span class="stat-lbl">código</span></div>
-              <div class="stat-divider" />
-              <div class="stat"><span class="stat-num">{{ formatDate(s.createdAt) }}</span><span class="stat-lbl">creado</span></div>
-            </div>
-            <p v-if="!s.questions.length" class="card-warn">⚠️ Sin preguntas — agrega al menos una para poder iniciar</p>
-          </div>
-          <div class="card-footer">
-            <button class="btn-code" @click="copyCode(s.code)" :class="{ copied: copiedCode === s.code }">{{ copiedCode === s.code ? '✅ Copiado' : '📋 ' + s.code }}</button>
-            <button class="btn-edit" @click="goToEdit(s.code)">Editar →</button>
-          </div>
-        </div>
-      </TransitionGroup>
+    <TransitionGroup v-else name="cards" tag="div" class="quiz-grid">
+                  <div v-for="s in filtered" :key="s.code" class="quiz-card" :class="`status-${s.status}`">
+                    <!-- Link principal que cubre toda la tarjeta (excepto botones) -->
+                    <a 
+                      href="#" 
+                      class="card-link" 
+                      @click.prevent="goToEdit(s.code)"
+                    >
+                      <div class="card-accent" :style="{ background: statusColor(s.status) }" />
+                      <div class="card-body">
+                        <div class="card-header-row">
+                          <span class="status-dot" :style="{ background: statusColor(s.status) }" />
+                          <span class="status-label">{{ statusLabel(s.status) }}</span>
+                          <!-- Menú con stopPropagation para evitar que el anchor lo capture -->
+                          <div class="card-menu" @click.stop>
+                            <button class="menu-btn" @click.stop="toggleMenu(s.code)">⋯</button>
+                            <div v-if="openMenu === s.code" class="dropdown" @click.stop>
+                              <button @click.stop="goToEdit(s.code)">✏️ Editar</button>
+                              <button @click.stop="viewAnalytics(s)">📊 Ver Estadísticas</button>
+                              <button 
+                                @click.stop="startSession(s.code)" 
+                                :disabled="s.status !== 'waiting' || !s.questions.length"
+                              >
+                                ▶️ Iniciar
+                              </button>
+                              <button class="danger" @click.stop="confirmDelete(s)">🗑 Eliminar</button>
+                            </div>
+                          </div>
+                        </div>
+                        <h2 class="card-title">{{ s.title }}</h2>
+                        <div class="card-stats">
+                          <div class="stat">
+                            <span class="stat-num">{{ s.questions.length }}</span>
+                            <span class="stat-lbl">preguntas</span>
+                          </div>
+                          <div class="stat-divider" />
+                          <div class="stat">
+                            <span class="stat-num code-mono">{{ s.code }}</span>
+                            <span class="stat-lbl">código</span>
+                          </div>
+                          <div class="stat-divider" />
+                          <div class="stat">
+                            <span class="stat-num">{{ formatDate(s.createdAt) }}</span>
+                            <span class="stat-lbl">creado</span>
+                          </div>
+                        </div>
+                        <p v-if="!s.questions.length" class="card-warn">⚠️ Sin preguntas — agrega al menos una para poder iniciar</p>
+                      </div>
+                    </a>
+                    
+                    <!-- Footer con botones (fuera del anchor) -->
+                    <div class="card-footer">
+                      <button 
+                        class="btn-code" 
+                        @click.stop="copyCode(s.code)" 
+                        :class="{ copied: copiedCode === s.code }"
+                      >
+                        {{ copiedCode === s.code ? '✅ Copiado' : '📋 ' + s.code }}
+                      </button>
+                      <button class="btn-edit" @click.stop="goToEdit(s.code)">
+                        Editar →
+                      </button>
+                    </div>
+                  </div>
+                </TransitionGroup>
     </div>
 
     <Transition name="modal">
@@ -317,7 +349,7 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 1rem; }
 .modal-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.75rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.1); }
 .modal-sm { max-width: 380px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .5rem;}
 .modal-header h2 { font-size: 1.2rem; color: #0f172a; }
 .modal-close { background: transparent; border: none; color: #94a3b8; font-size: 1.4rem; cursor: pointer; line-height: 1; padding: .1rem .3rem; border-radius: 4px; }
 .modal-close:hover { color: #475569; }
