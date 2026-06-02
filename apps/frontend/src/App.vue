@@ -89,7 +89,16 @@ const authStore = useAuthStore()
 const showNav = computed(() => !route.meta.hideNav)
 
 onMounted(() => {
-  authStore.fetchUser()
+   setTimeout(() => {
+    const loader = document.getElementById('app-loading')
+    if (loader) {
+      loader.classList.add('hidden')
+      setTimeout(() => loader.remove(), 500)
+    }
+  }, 500)
+
+  // Restore auth state
+  if (authStore.token) authStore.fetchUser()
 })
 </script>
 

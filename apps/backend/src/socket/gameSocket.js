@@ -47,6 +47,30 @@ export function setupGameSocket(io) {
       }
     });
 
+    // ✅ FIX NUEVO: host:start — inicia la partida cambiando status a 'active'
+    socket.on('host:start', async ({ code }) => {
+      try {
+        const cleanCode = code.toUpperCase();
+        const session = await Session.findOneAndUpdate(
+          { code: cleanCode, status: 'waiting' },
+          { status: 'active' },
+          { new: true }
+        );
+        if (!session) {
+          return socket.emit('error', { message: 'No se pudo iniciar la partida. ¿Ya fue iniciada o no existe?' });
+        }
+
+        io.to(cleanCode).emit('quiz:started', {
+          title: session.title,
+          totalQuestions: session.questions.length
+        });
+
+        console.log(`🚀 Partida iniciada: ${cleanCode} — ${session.title}`);
+      } catch (err) {
+        socket.emit('error', { message: err.message });
+      }
+    });
+
     socket.on('host:end', async ({ code }) => {
       try {
         const session = await Session.findOneAndUpdate(
@@ -97,20 +121,25 @@ export function setupGameSocket(io) {
           return socket.emit('error', { message: 'Este quiz ya terminó.' });
         }
 
-        // Limpiar zombies: solo eliminar jugadores sin progreso (score 0, sin respuestas)
-        // que ya no tienen socket activo. Los jugadores con progreso se conservan siempre.
+        // ✅ FIX: Limpiar zombies ANTES de agregar el nuevo jugador
+        // Solo eliminar jugadores sin progreso (score 0, sin respuestas) y sin socket activo
         const connectedSocketIds = Array.from(io.sockets.sockets.keys());
 
         if (session.players && session.players.length > 0) {
+          const beforeCount = session.players.length;
           session.players = session.players.filter(p => {
             const isAlive = connectedSocketIds.includes(p.socketId);
             const hasProgress = (p.score > 0) || (p.answers && p.answers.length > 0);
+            // Conservar si: está conectado, O tiene progreso, O es el jugador que se está reconectando
             if (!isAlive && !hasProgress) {
               console.log(`🧹 Zombie eliminado: ${p.name}`);
               return false;
             }
             return true;
           });
+          if (session.players.length < beforeCount) {
+            console.log(`🧹 Limpieza: ${beforeCount - session.players.length} zombies eliminados`);
+          }
         }
 
         // Buscar por playerId o nombre
@@ -280,20 +309,40 @@ export function setupGameSocket(io) {
       console.log('🔌 Desconectado:', socket.id, 'Razón:', reason);
       if (!socket.data.code) return;
 
-      const gracePeriod = (reason === 'transport close' || reason === 'ping timeout') ? 2000 : 0;
+      // ✅ FIX: Grace period solo para desconexiones de red (no cierre intencional)
+      const gracePeriod = (reason === 'transport close' || reason === 'ping timeout') ? 3000 : 0;
 
       setTimeout(async () => {
         try {
           const session = await Session.findOne({ code: socket.data.code });
           if (!session) return;
 
+          // Verificar si el jugador se reconectó con otro socket
           const reconnected = session.players.find(p => 
             p.playerId === socket.data.playerId && p.socketId !== socket.id
           );
 
           if (reconnected) {
-            console.log(`🔄 ${socket.data.name} reconectado`);
+            console.log(`🔄 ${socket.data.name} reconectado con nuevo socket`);
             return;
+          }
+
+          // Verificar si el socket original sigue conectado (caso edge)
+          const stillConnected = io.sockets.sockets.get(socket.id);
+          if (stillConnected && stillConnected.connected) {
+            console.log(`⚠️ Socket ${socket.id} aún conectado, no eliminar`);
+            return;
+          }
+
+          // ✅ FIX: Solo eliminar si NO tiene progreso (score 0 y sin respuestas)
+          const player = session.players.find(p => p.socketId === socket.id);
+          if (player) {
+            const hasProgress = (player.score > 0) || (player.answers && player.answers.length > 0);
+            if (hasProgress) {
+              console.log(`💾 ${player.name} conservado (tiene progreso: ${player.score} pts, ${player.answers?.length || 0} respuestas)`);
+              // No eliminar, mantener para reconexión
+              return;
+            }
           }
 
           await Session.updateOne(

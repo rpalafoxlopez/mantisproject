@@ -46,17 +46,29 @@ const error = ref('')
 const nameInput = ref(null)
 
 let socket = null
+let timeoutId = null        // ✅ FIX: Guardar referencia para limpiar
+let connectHandler = null   // ✅ FIX: Guardar referencia para limpiar
 
 onMounted(() => {
   const codeFromUrl = route.query.code
   if (codeFromUrl) code.value = codeFromUrl.toUpperCase()
 })
 
+// ✅ FIX: Limpiar todos los listeners y timers al desmontar
 onUnmounted(() => {
+  if (timeoutId) {
+    clearTimeout(timeoutId)
+    timeoutId = null
+  }
   if (socket) {
+    if (connectHandler) {
+      socket.off('connect', connectHandler)
+      connectHandler = null
+    }
     socket.off('player:joined')
     socket.off('error')
     socket.off('connect_error')
+    // No destruir el socket aquí — puede ser reutilizado en PlayView
   }
 })
 
@@ -68,6 +80,7 @@ function joinQuiz() {
   joining.value = true
   error.value = ''
 
+  // ✅ FIX: Crear socket fresh si no existe, o reusar existente
   if (!socket) {
     socket = io(API, {
       transports: ['websocket', 'polling'],
@@ -78,53 +91,74 @@ function joinQuiz() {
     })
   }
 
+  // Limpiar listeners previos para evitar duplicados
   socket.off('player:joined')
   socket.off('error')
   socket.off('connect_error')
+  if (connectHandler) {
+    socket.off('connect', connectHandler)
+  }
 
-  socket.once('player:joined', ({ code: c, title }) => {
+  // ✅ FIX: Definir handlers primero
+  const onJoined = ({ code: c, title }) => {
     console.log('✅ Unido al quiz:', title)
+    // Limpiar timeout de seguridad
+    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null }
     localStorage.setItem('quizhive_player_code', c)
     localStorage.setItem('quizhive_player_name', name.value.trim())
     router.push(`/play?code=${c}&name=${encodeURIComponent(name.value.trim())}`)
-  })
+  }
 
-  socket.once('error', ({ message }) => {
+  const onError = ({ message }) => {
     console.log('❌ Error:', message)
     error.value = message
     joining.value = false
-  })
+    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null }
+  }
 
-  socket.once('connect_error', () => {
+  const onConnectError = () => {
     error.value = 'No se pudo conectar al servidor.'
     joining.value = false
-  })
+    if (timeoutId) { clearTimeout(timeoutId); timeoutId = null }
+  }
 
-  const timeoutId = setTimeout(() => {
+  socket.once('player:joined', onJoined)
+  socket.once('error', onError)
+  socket.once('connect_error', onConnectError)
+
+  // ✅ FIX: Timeout de seguridad — guardar referencia para poder cancelar
+  timeoutId = setTimeout(() => {
     if (joining.value) {
       error.value = 'El servidor no respondió. Intenta de nuevo.'
       joining.value = false
     }
   }, 8000)
 
+  // ✅ FIX: Emitir solo cuando el socket esté conectado
   const doEmit = () => {
-    clearTimeout(timeoutId)
-    setTimeout(() => {
+    // Reiniciar timeout de seguridad
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => {
       if (joining.value) {
         error.value = 'El servidor no respondió. Intenta de nuevo.'
         joining.value = false
       }
     }, 8000)
+
     socket.emit('player:join', {
       code: code.value.trim(),
-      name: name.value.trim()
+      name: name.value.trim(),
+      playerId: localStorage.getItem('quizhive_player_id') || undefined
     })
   }
 
   if (socket.connected) {
+    console.log('✅ Socket ya conectado, emitiendo inmediatamente')
     doEmit()
   } else {
-    socket.once('connect', doEmit)
+    console.log('⏳ Esperando conexión del socket...')
+    connectHandler = doEmit
+    socket.once('connect', connectHandler)
   }
 }
 </script>

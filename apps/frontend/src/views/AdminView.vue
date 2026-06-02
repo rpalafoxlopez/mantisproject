@@ -11,7 +11,15 @@
     </header>
 
     <main class="admin-main">
-      <section v-if="!currentSession" class="card create-card">
+      <!-- ✅ FIX: Estado de carga mientras se resuelve la sesión -->
+      <section v-if="loading" class="card create-card">
+        <div class="loading-state">
+          <div class="spinner"></div>
+          <p>Cargando sesión...</p>
+        </div>
+      </section>
+
+      <section v-else-if="!currentSession" class="card create-card">
         <h2>Nueva Partida</h2>
         <p class="subtitle">Crea una partida, escribe tus preguntas y comparte el código con los jugadores.</p>
         <div class="field">
@@ -49,6 +57,8 @@
           </div>
           <div class="session-meta">
             <span class="badge badge-waiting" v-if="currentSession.status === 'waiting'">En espera</span>
+            <span class="badge badge-active" v-else-if="currentSession.status === 'active'">En juego</span>
+            <span class="badge badge-finished" v-else-if="currentSession.status === 'finished'">Finalizado</span>
             <span>{{ currentSession.questions.length }} preguntas</span>
             <button class="btn-danger-sm" @click="deleteSession">🗑 Eliminar partida</button>
           </div>
@@ -132,6 +142,7 @@ const showForm = ref(false)
 const editIndex = ref(null)
 const saving = ref(false)
 const formError = ref('')
+const loading = ref(true)  // ✅ FIX: Estado de carga
 const form = ref(emptyForm())
 
 function emptyForm() {
@@ -140,20 +151,58 @@ function emptyForm() {
 
 const shareUrl = computed(() => currentSession.value ? `${window.location.origin}/join?code=${currentSession.value.code}` : '')
 
+// ✅ FIX: Lógica de onMounted completamente reescrita
 onMounted(async () => {
-  await fetchWaitingSessions()
-  const codeFromUrl = route.query.code
-  if (codeFromUrl) { await loadSession(codeFromUrl.toUpperCase()); return }
-  const saved = localStorage.getItem('quizhive_admin_code')
-  if (saved) {
-    try { const { data } = await axios.get(`${API}/api/sessions/${saved}`); currentSession.value = data }
-    catch { localStorage.removeItem('quizhive_admin_code') }
+  loading.value = true
+  currentSession.value = null
+
+  try {
+    // 1. Cargar lista de sesiones en espera (para el panel "Nueva Partida")
+    await fetchWaitingSessions()
+
+    // 2. PRIORIDAD 1: Código desde query param (?code=XYZ)
+    const codeFromUrl = route.query.code
+    if (codeFromUrl) {
+      console.log('🔍 Cargando sesión desde URL:', codeFromUrl)
+      const loaded = await loadSession(codeFromUrl.toUpperCase())
+      if (loaded) {
+        loading.value = false
+        return
+      }
+      // Si falla la carga desde URL, continuar con fallback
+    }
+
+    // 3. PRIORIDAD 2: Código guardado en localStorage
+    const saved = localStorage.getItem('quizhive_admin_code')
+    if (saved) {
+      console.log('🔍 Cargando sesión desde localStorage:', saved)
+      const loaded = await loadSession(saved.toUpperCase())
+      if (loaded) {
+        loading.value = false
+        return
+      }
+      // Si no existe más, limpiar
+      localStorage.removeItem('quizhive_admin_code')
+    }
+
+    // 4. Ninguna sesión cargada — mostrar "Nueva Partida"
+    console.log('📭 No hay sesión activa, mostrando formulario de creación')
+    currentSession.value = null
+
+  } catch (err) {
+    console.error('❌ Error en onMounted:', err)
+    currentSession.value = null
+  } finally {
+    loading.value = false
   }
 })
 
 async function fetchWaitingSessions() {
-  try { const { data } = await axios.get(`${API}/api/sessions`); waitingSessions.value = data.filter(s => s.status === 'waiting') }
-  catch { /* silent */ }
+  try { 
+    const { data } = await axios.get(`${API}/api/sessions`)
+    // ✅ FIX: Incluir 'waiting' y 'active' (sesiones editables)
+    waitingSessions.value = data.filter(s => s.status === 'waiting' || s.status === 'active')
+  } catch { /* silent */ }
 }
 
 async function createSession() {
@@ -164,36 +213,101 @@ async function createSession() {
     currentSession.value = data
     localStorage.setItem('quizhive_admin_code', data.code)
     newTitle.value = ''
-  } catch (e) { createError.value = e.response?.data?.error || 'Error al crear la partida.' }
-  finally { creating.value = false }
+  } catch (e) { 
+    createError.value = e.response?.data?.error || 'Error al crear la partida.' 
+  } finally { 
+    creating.value = false 
+  }
 }
 
+// ✅ FIX: loadSession ahora retorna booleano y maneja errores correctamente
 async function loadSession(code) {
-  try { const { data } = await axios.get(`${API}/api/sessions/${code}`); currentSession.value = data; localStorage.setItem('quizhive_admin_code', data.code) }
-  catch { alert('No se pudo cargar la partida.') }
+  if (!code) return false
+  try { 
+    const { data } = await axios.get(`${API}/api/sessions/${code}`)
+    // ✅ FIX: Aceptar 'waiting' y 'active' como estados editables
+    if (data && (data.status === 'waiting' || data.status === 'active')) {
+      currentSession.value = data
+      localStorage.setItem('quizhive_admin_code', data.code)
+      console.log('✅ Sesión cargada:', data.title, '-', data.code, '- status:', data.status)
+      return true
+    } else {
+      console.log('⚠️ Sesión no editable, status:', data?.status)
+      return false
+    }
+  } catch (err) { 
+    console.error('❌ Error cargando sesión:', code, err.message)
+    return false
+  }
 }
 
-function exitSession() { currentSession.value = null; localStorage.removeItem('quizhive_admin_code'); router.push('/dashboard') }
+function exitSession() { 
+  currentSession.value = null
+  localStorage.removeItem('quizhive_admin_code')
+  router.push('/dashboard') 
+}
 
 async function deleteSession() {
   if (!confirm('¿Eliminar esta partida y todas sus preguntas?')) return
-  try { await axios.delete(`${API}/api/sessions/${currentSession.value.code}`); exitSession() }
-  catch { alert('Error al eliminar la partida.') }
+  try { 
+    await axios.delete(`${API}/api/sessions/${currentSession.value.code}`)
+    localStorage.removeItem('quizhive_admin_code')
+    exitSession() 
+  } catch { 
+    alert('Error al eliminar la partida.') 
+  }
 }
 
-function copyCode() { navigator.clipboard.writeText(currentSession.value.code); codeCopied.value = true; setTimeout(() => (codeCopied.value = false), 2000) }
-function shareLink() { if (navigator.share) { navigator.share({ title: currentSession.value.title, url: shareUrl.value }) } else { navigator.clipboard.writeText(shareUrl.value); alert('Enlace copiado al portapapeles.') } }
+function copyCode() { 
+  navigator.clipboard.writeText(currentSession.value.code)
+  codeCopied.value = true
+  setTimeout(() => (codeCopied.value = false), 2000) 
+}
+
+function shareLink() { 
+  if (navigator.share) { 
+    navigator.share({ title: currentSession.value.title, url: shareUrl.value }) 
+  } else { 
+    navigator.clipboard.writeText(shareUrl.value)
+    alert('Enlace copiado al portapapeles.') 
+  } 
+}
 
 function openQuestionForm(index) {
-  editIndex.value = index; formError.value = ''
-  if (index === null) { form.value = emptyForm() }
-  else { const q = currentSession.value.questions[index]; form.value = { text: q.text, timeLimit: q.timeLimit, options: q.options.map(o => ({ text: o.text, isCorrect: o.isCorrect })) } }
+  editIndex.value = index
+  formError.value = ''
+  if (index === null) { 
+    form.value = emptyForm() 
+  } else { 
+    const q = currentSession.value.questions[index]
+    form.value = { 
+      text: q.text, 
+      timeLimit: q.timeLimit, 
+      options: q.options.map(o => ({ text: o.text, isCorrect: o.isCorrect })) 
+    } 
+  }
   showForm.value = true
 }
-function closeForm() { showForm.value = false; formError.value = '' }
-function addOption() { if (form.value.options.length < 6) form.value.options.push({ text: '', isCorrect: false }) }
-function removeOption(i) { if (form.value.options.length <= 2) return; const wasCorrect = form.value.options[i].isCorrect; form.value.options.splice(i, 1); if (wasCorrect) form.value.options[0].isCorrect = true }
-function setCorrect(i) { form.value.options.forEach((o, idx) => (o.isCorrect = idx === i)) }
+
+function closeForm() { 
+  showForm.value = false
+  formError.value = '' 
+}
+
+function addOption() { 
+  if (form.value.options.length < 6) form.value.options.push({ text: '', isCorrect: false }) 
+}
+
+function removeOption(i) { 
+  if (form.value.options.length <= 2) return
+  const wasCorrect = form.value.options[i].isCorrect
+  form.value.options.splice(i, 1)
+  if (wasCorrect) form.value.options[0].isCorrect = true 
+}
+
+function setCorrect(i) { 
+  form.value.options.forEach((o, idx) => (o.isCorrect = idx === i)) 
+}
 
 function validateForm() {
   if (!form.value.text.trim()) return 'El texto de la pregunta es requerido.'
@@ -205,23 +319,43 @@ function validateForm() {
 }
 
 async function saveQuestion() {
-  const err = validateForm(); if (err) { formError.value = err; return }
-  saving.value = true; formError.value = ''
+  const err = validateForm()
+  if (err) { 
+    formError.value = err
+    return 
+  }
+  saving.value = true
+  formError.value = ''
   const code = currentSession.value.code
-  const payload = { text: form.value.text.trim(), options: form.value.options, timeLimit: form.value.timeLimit }
+  const payload = { 
+    text: form.value.text.trim(), 
+    options: form.value.options, 
+    timeLimit: form.value.timeLimit 
+  }
   try {
     let res
-    if (editIndex.value === null) { res = await axios.post(`${API}/api/sessions/${code}/questions`, payload) }
-    else { res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload) }
-    currentSession.value = res.data; closeForm()
-  } catch (e) { formError.value = e.response?.data?.error || 'Error al guardar la pregunta.' }
-  finally { saving.value = false }
+    if (editIndex.value === null) { 
+      res = await axios.post(`${API}/api/sessions/${code}/questions`, payload) 
+    } else { 
+      res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload) 
+    }
+    currentSession.value = res.data
+    closeForm()
+  } catch (e) { 
+    formError.value = e.response?.data?.error || 'Error al guardar la pregunta.' 
+  } finally { 
+    saving.value = false 
+  }
 }
 
 async function deleteQuestion(idx) {
   if (!confirm('¿Eliminar esta pregunta?')) return
-  try { const { data } = await axios.delete(`${API}/api/sessions/${currentSession.value.code}/questions/${idx}`); currentSession.value = data }
-  catch { alert('Error al eliminar la pregunta.') }
+  try { 
+    const { data } = await axios.delete(`${API}/api/sessions/${currentSession.value.code}/questions/${idx}`)
+    currentSession.value = data 
+  } catch { 
+    alert('Error al eliminar la pregunta.') 
+  }
 }
 </script>
 
@@ -279,6 +413,8 @@ input[type="number"] { width: 80px; }
 .btn-add-option:hover { border-color: #16a34a; color: #16a34a; }
 .badge { font-size: .75rem; padding: .2rem .6rem; border-radius: 20px; font-weight: 600; }
 .badge-waiting { background: #dcfce7; color: #16a34a; }
+.badge-active { background: #fef3c7; color: #b45309; }
+.badge-finished { background: #f3f4f6; color: #6b7280; }
 .error-msg { color: #dc2626; font-size: .85rem; margin-top: .4rem; }
 .prev-sessions { margin-top: 1.5rem; border-top: 1px solid #e2e8f0; padding-top: 1rem; }
 .prev-sessions h3 { font-size: .9rem; color: #64748b; margin-bottom: .7rem; }
@@ -304,4 +440,9 @@ input[type="number"] { width: 80px; }
 .qlist-enter-active, .qlist-leave-active { transition: all .25s; }
 .qlist-enter-from { opacity: 0; transform: translateY(-8px); }
 .qlist-leave-to { opacity: 0; transform: translateX(10px); }
+
+/* ✅ FIX: Estado de carga */
+.loading-state { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 2rem; color: #64748b; }
+.loading-state .spinner { width: 32px; height: 32px; border: 3px solid #e2e8f0; border-top-color: #16a34a; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 </style>

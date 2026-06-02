@@ -22,7 +22,7 @@ router.post('/create', async (req, res) => {
       title: title.trim(),
       code,
       questions: [],
-      status: 'active'
+      status: 'waiting'  // ✅ FIX: Era 'active', ahora 'waiting'
     });
 
     await session.save();
@@ -36,7 +36,7 @@ router.post('/create', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const sessions = await Session.find()
-      .select('code title status questions createdAt')
+      .select('code title status questions players createdAt')
       .sort({ createdAt: -1 });
     res.json(sessions);
   } catch (err) {

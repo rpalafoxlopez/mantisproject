@@ -65,9 +65,6 @@
 
       <TransitionGroup v-else name="cards" tag="div" class="quiz-grid">
         <div v-for="s in filtered" :key="s.code" class="quiz-card" :class="`status-${s.status}`">
-          <!-- ═══════════════════════════════════════════════════════ -->
-          <!-- ✅ FIX: Tarjeta como div, no anchor. Menú completamente separado -->
-          <!-- ═══════════════════════════════════════════════════════ -->
           <div class="card-accent" :style="{ background: statusColor(s.status) }" />
 
           <div class="card-body">
@@ -77,7 +74,6 @@
                 <span class="status-label">{{ statusLabel(s.status) }}</span>
               </div>
 
-              <!-- ✅ FIX: Menú con z-index alto y stopPropagation correcto -->
               <div class="card-menu" @click.stop>
                 <button 
                   class="menu-btn" 
@@ -87,7 +83,6 @@
                   <span class="menu-dots">⋯</span>
                 </button>
 
-                <!-- Dropdown con animación y posicionamiento fijo -->
                 <Transition name="dropdown">
                   <div v-if="openMenu === s.code" class="dropdown" @click.stop>
                     <button @click.stop="goToEdit(s.code)" class="dropdown-item">
@@ -112,7 +107,6 @@
               </div>
             </div>
 
-            <!-- Título clickable para editar -->
             <h2 class="card-title" @click="goToEdit(s.code)">{{ s.title }}</h2>
 
             <div class="card-stats">
@@ -134,14 +128,12 @@
 
             <p v-if="!s.questions.length" class="card-warn">⚠️ Sin preguntas — agrega al menos una para poder iniciar</p>
 
-            <!-- ✅ NUEVO: Badges de jugadores -->
             <div v-else-if="s.players && s.players.length > 0" class="card-players-mini">
               <span class="players-badge">👥 {{ s.players.length }} jugador{{ s.players.length === 1 ? '' : 'es' }}</span>
               <span v-if="s.status === 'finished'" class="finished-badge">🏁 Finalizado</span>
             </div>
           </div>
 
-          <!-- Footer con botones -->
           <div class="card-footer">
             <button 
               class="btn-code" 
@@ -192,7 +184,6 @@
       </div>
     </Transition>
 
-    <!-- ✅ Overlay para cerrar menú al hacer click fuera -->
     <div v-if="openMenu" class="menu-overlay" @click="openMenu = null"></div>
 
     <QuizAnalyticsModal
@@ -309,7 +300,6 @@ const deleting = ref(false)
 const showAnalyticsModal = ref(false)
 const selectedQuiz = ref(null)
 
-// Sidebar modals
 const showStatsModal = ref(false)
 const showTopUsersModal = ref(false)
 const showHistoryModal = ref(false)
@@ -337,7 +327,6 @@ const filtered = computed(() => {
 
 onMounted(() => {
   fetchSessions()
-  // ✅ FIX: Cerrar menú con tecla Escape
   document.addEventListener('keydown', handleEscape)
 })
 
@@ -345,7 +334,6 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleEscape)
 })
 
-// ✅ FIX: Cerrar menú con tecla Escape
 function handleEscape(e) {
   if (e.key === 'Escape') {
     openMenu.value = null
@@ -393,7 +381,6 @@ function startSession(code) {
   router.push(`/host?code=${code}`) 
 }
 
-// ✅ FIX: Toggle menu con prevención de doble apertura
 function toggleMenu(code) {
   if (openMenu.value === code) {
     openMenu.value = null
@@ -440,7 +427,6 @@ function onQuizDeleted(code) {
   selectedQuiz.value = null
 }
 
-// Top users: aggregate across all sessions/players
 const topUsers = computed(() => {
   const map = {}
   sessions.value.forEach(s => {
@@ -453,7 +439,6 @@ const topUsers = computed(() => {
   return Object.values(map).sort((a, b) => b.score - a.score).slice(0, 10)
 })
 
-// History: all sessions sorted by date desc
 const sessionsHistory = computed(() =>
   [...sessions.value].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 )
@@ -490,29 +475,19 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .filter-tab { background: transparent; border: none; color: #64748b; padding: .3rem .75rem; border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 500; transition: background .15s, color .15s; }
 .filter-tab.active { background: #dcfce7; color: #16a34a; }
 
-/* ═══════════════════════════════════════════════════════ */
-/* ✅ FIX: Grid de tarjetas mejorado */
-/* ═══════════════════════════════════════════════════════ */
 .quiz-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; align-content: start; }
 
-/* Quiz Card */
 .quiz-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; transition: all 0.2s ease; position: relative; }
 .quiz-card:hover { border-color: #bbf7d0; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.08); }
 
 .card-accent { height: 4px; width: 100%; }
 .card-body { padding: 1rem 1rem 0.6rem; }
 
-/* ═══════════════════════════════════════════════════════ */
-/* ✅ FIX: Header row con status y menú bien separados */
-/* ═══════════════════════════════════════════════════════ */
 .card-header-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
 .status-group { display: flex; align-items: center; gap: 0.5rem; flex: 1; }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .status-label { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05rem; font-weight: 700; }
 
-/* ═══════════════════════════════════════════════════════ */
-/* ✅ FIX: Menú desplegable reparado */
-/* ═══════════════════════════════════════════════════════ */
 .card-menu { position: relative; z-index: 100; }
 
 .menu-btn { 
@@ -541,7 +516,6 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .menu-btn.active { background: #f1f5f9; }
 .menu-btn.active .menu-dots { color: #475569; }
 
-/* Dropdown con posicionamiento absoluto correcto */
 .dropdown { 
   position: absolute; 
   right: 0; 
@@ -580,7 +554,6 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 
 .dropdown-divider { height: 1px; background: #f1f5f9; margin: 4px 0; }
 
-/* Animación del dropdown */
 .dropdown-enter-active, .dropdown-leave-active { 
   transition: all 0.15s ease; 
 }
@@ -589,9 +562,6 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
   transform: scale(0.95) translateY(-4px); 
 }
 
-/* ═══════════════════════════════════════════════════════ */
-/* ✅ FIX: Overlay para cerrar menú al hacer click fuera */
-/* ═══════════════════════════════════════════════════════ */
 .menu-overlay { 
   position: fixed; 
   inset: 0; 
@@ -610,12 +580,10 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .stat-divider { width: 1px; height: 28px; background: #e2e8f0; }
 .card-warn { font-size: 0.75rem; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; border-radius: 8px; padding: 0.3rem 0.6rem; margin-top: 0.4rem; }
 
-/* Badges de jugadores */
 .card-players-mini { display: flex; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
 .players-badge { font-size: 0.75rem; color: #3b82f6; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 0.2rem 0.6rem; }
 .finished-badge { font-size: 0.75rem; color: #16a34a; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 0.2rem 0.6rem; }
 
-/* Footer */
 .card-footer { padding: 0.75rem 1rem; border-top: 1px solid #f1f5f9; display: flex; gap: 0.5rem; justify-content: space-between; align-items: center; background: #ffffff; }
 .btn-code { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; border-radius: 8px; padding: 0.4rem 0.8rem; font-size: 0.8rem; font-family: 'Courier New', monospace; cursor: pointer; transition: all 0.2s; font-weight: 500; }
 .btn-code:hover { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
@@ -632,7 +600,6 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .empty-state h3 { font-size: 1.1rem; color: #334155; margin-bottom: 0.4rem; }
 .empty-state p { font-size: 0.9rem; margin-bottom: 1.5rem; }
 
-/* Modales */
 .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 1rem; }
 .modal-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 20px; padding: 1.75rem; width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,.15); }
 .modal-sm { max-width: 380px; }
@@ -659,14 +626,33 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.6s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Transiciones */
 .modal-enter-active, .modal-leave-active { transition: opacity 0.2s, transform 0.2s; }
 .modal-enter-from, .modal-leave-to { opacity: 0; transform: scale(0.95); }
 .cards-enter-active, .cards-leave-active { transition: all 0.22s ease; }
 .cards-enter-from { opacity: 0; transform: translateY(10px); }
 .cards-leave-to { opacity: 0; transform: scale(0.95); }
 
-/* Responsive */
+/* Table styles for modals */
+.modal-wide { max-width: 800px; }
+.stats-table-wrap { overflow-x: auto; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.stats-table th { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+.stats-table td { padding: 0.75rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.stats-table tr:hover td { background: #f8fafc; }
+.st-title { font-weight: 600; color: #0f172a; }
+.status-pill { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; }
+.empty-row { text-align: center; color: #94a3b8; padding: 2rem; }
+
+.top-users-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.top-user-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px; }
+.top-rank { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 700; font-size: 0.85rem; background: #e2e8f0; color: #64748b; }
+.top-rank.gold { background: #fef3c7; color: #b45309; }
+.top-rank.silver { background: #f3f4f6; color: #6b7280; }
+.top-rank.bronze { background: #fef2f2; color: #991b1b; }
+.top-name { flex: 1; font-weight: 600; color: #0f172a; }
+.top-score { font-weight: 700; color: #16a34a; }
+.top-games { font-size: 0.8rem; color: #94a3b8; }
+
 @media (max-width: 768px) { 
   .sidebar { display: none; } 
   .main { padding: 1rem; } 
