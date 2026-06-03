@@ -46,8 +46,9 @@ const SessionSchema = new mongoose.Schema({
     default: [],
     validate: { validator: qs => qs.length <= 100, message: 'Una partida puede tener como máximo 100 preguntas.' }
   },
-  status: { type: String, enum: ['active', 'finished'], default: 'active' },
+  status: { type: String, enum: ['waiting', 'active', 'finished'], default: 'waiting' },
   players: { type: [PlayerSchema], default: [] },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
   createdAt: { type: Date, default: Date.now, expires: 86400 }
 });
 

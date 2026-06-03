@@ -127,6 +127,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import { useAuthStore } from '../stores/auth.js'
+
+const authStore = useAuthStore()
+function authHeaders() {
+  return { headers: { Authorization: `Bearer ${authStore.token}` } }
+}
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const route = useRoute()
@@ -199,7 +205,7 @@ onMounted(async () => {
 
 async function fetchWaitingSessions() {
   try { 
-    const { data } = await axios.get(`${API}/api/sessions`)
+    const { data } = await axios.get(`${API}/api/sessions`, authHeaders())
     // ✅ FIX: Incluir 'waiting' y 'active' (sesiones editables)
     waitingSessions.value = data.filter(s => s.status === 'waiting' || s.status === 'active')
   } catch { /* silent */ }
@@ -209,7 +215,7 @@ async function createSession() {
   if (!newTitle.value.trim()) return
   creating.value = true; createError.value = ''
   try {
-    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() })
+    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() }, authHeaders())
     currentSession.value = data
     localStorage.setItem('quizhive_admin_code', data.code)
     newTitle.value = ''
@@ -224,7 +230,7 @@ async function createSession() {
 async function loadSession(code) {
   if (!code) return false
   try { 
-    const { data } = await axios.get(`${API}/api/sessions/${code}`)
+    const { data } = await axios.get(`${API}/api/sessions/${code}`, authHeaders())
     // ✅ FIX: Aceptar 'waiting' y 'active' como estados editables
     if (data && (data.status === 'waiting' || data.status === 'active')) {
       currentSession.value = data
@@ -250,7 +256,7 @@ function exitSession() {
 async function deleteSession() {
   if (!confirm('¿Eliminar esta partida y todas sus preguntas?')) return
   try { 
-    await axios.delete(`${API}/api/sessions/${currentSession.value.code}`)
+    await axios.delete(`${API}/api/sessions/${currentSession.value.code}`, authHeaders())
     localStorage.removeItem('quizhive_admin_code')
     exitSession() 
   } catch { 
@@ -335,9 +341,9 @@ async function saveQuestion() {
   try {
     let res
     if (editIndex.value === null) { 
-      res = await axios.post(`${API}/api/sessions/${code}/questions`, payload) 
+      res = await axios.post(`${API}/api/sessions/${code}/questions`, payload, authHeaders()) 
     } else { 
-      res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload) 
+      res = await axios.put(`${API}/api/sessions/${code}/questions/${editIndex.value}`, payload, authHeaders()) 
     }
     currentSession.value = res.data
     closeForm()
@@ -351,7 +357,7 @@ async function saveQuestion() {
 async function deleteQuestion(idx) {
   if (!confirm('¿Eliminar esta pregunta?')) return
   try { 
-    const { data } = await axios.delete(`${API}/api/sessions/${currentSession.value.code}/questions/${idx}`)
+    const { data } = await axios.delete(`${API}/api/sessions/${currentSession.value.code}/questions/${idx}`, authHeaders())
     currentSession.value = data 
   } catch { 
     alert('Error al eliminar la pregunta.') 

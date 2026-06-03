@@ -25,8 +25,11 @@
       </nav>
       <div class="sidebar-footer">
         <div class="admin-chip">
-          <span class="admin-avatar">A</span>
-          <span>Admin</span>
+          <span class="admin-avatar">{{ authStore.user?.name?.charAt(0)?.toUpperCase() || 'U' }}</span>
+          <div class="admin-info">
+            <span class="admin-name">{{ authStore.user?.name || 'Usuario' }}</span>
+            <button class="logout-btn" @click="authStore.logout(); router.push('/login')">Cerrar sesión</button>
+          </div>
         </div>
       </div>
     </aside>
@@ -198,22 +201,44 @@
       <div v-if="showStatsModal" class="modal-overlay" @click.self="showStatsModal = false">
         <div class="modal-card modal-wide">
           <div class="modal-header">
-            <h2>📊 Estadísticas por Quiz</h2>
+            <div class="modal-header-left">
+              <span class="modal-icon">📊</span>
+              <div>
+                <h2>Estadísticas por Quiz</h2>
+                <p class="modal-subtitle">{{ sessions.length }} quiz{{ sessions.length !== 1 ? 'zes' : '' }} en total</p>
+              </div>
+            </div>
             <button class="modal-close" @click="showStatsModal = false">×</button>
           </div>
           <div class="stats-table-wrap">
             <table class="stats-table">
-              <thead><tr><th>Quiz</th><th>Código</th><th>Estado</th><th>Jugadores</th><th>Preguntas</th><th>Creado</th></tr></thead>
-              <tbody>
-                <tr v-for="s in sessions" :key="s.code">
-                  <td class="st-title">{{ s.title }}</td>
-                  <td><span class="code-mono">{{ s.code }}</span></td>
-                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '22', color: statusColor(s.status) }">{{ statusLabel(s.status) }}</span></td>
-                  <td>{{ s.players?.length || 0 }}</td>
-                  <td>{{ s.questions.length }}</td>
-                  <td>{{ formatDate(s.createdAt) }}</td>
+              <thead>
+                <tr>
+                  <th>Quiz</th>
+                  <th>Código</th>
+                  <th>Estado</th>
+                  <th class="th-num">Jugadores</th>
+                  <th class="th-num">Preguntas</th>
+                  <th>Creado</th>
                 </tr>
-                <tr v-if="!sessions.length"><td colspan="6" class="empty-row">No hay quizzes aún</td></tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in sessions" :key="s.code" class="table-row">
+                  <td class="st-title">
+                    <span class="title-dot" :style="{ background: statusColor(s.status) }"></span>
+                    {{ s.title }}
+                  </td>
+                  <td><span class="code-badge">{{ s.code }}</span></td>
+                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '18', color: statusColor(s.status), borderColor: statusColor(s.status) + '44' }">{{ statusLabel(s.status) }}</span></td>
+                  <td class="td-num">
+                    <span class="num-chip players-chip">👥 {{ s.players?.length || 0 }}</span>
+                  </td>
+                  <td class="td-num">
+                    <span class="num-chip questions-chip">❓ {{ s.questions.length }}</span>
+                  </td>
+                  <td class="td-date">{{ formatDate(s.createdAt) }}</td>
+                </tr>
+                <tr v-if="!sessions.length"><td colspan="6" class="empty-row"><span class="empty-icon">🐝</span> No hay quizzes aún</td></tr>
               </tbody>
             </table>
           </div>
@@ -226,20 +251,45 @@
       <div v-if="showTopUsersModal" class="modal-overlay" @click.self="showTopUsersModal = false">
         <div class="modal-card modal-wide">
           <div class="modal-header">
-            <h2>🏆 Top Jugadores del Mes</h2>
+            <div class="modal-header-left">
+              <span class="modal-icon">🏆</span>
+              <div>
+                <h2>Top Jugadores del Mes</h2>
+                <p class="modal-subtitle">Ranking por puntos acumulados</p>
+              </div>
+            </div>
             <button class="modal-close" @click="showTopUsersModal = false">×</button>
           </div>
           <div class="top-users-list">
-            <div v-if="topUsers.length === 0" class="empty-state" style="padding: 2rem">
+            <div v-if="topUsers.length === 0" class="empty-state" style="padding: 2.5rem">
               <div class="empty-icon">🐝</div>
               <p>No hay datos de jugadores aún.</p>
             </div>
-            <div v-for="(u, i) in topUsers" :key="u.name" class="top-user-row">
-              <span class="top-rank" :class="{ gold: i===0, silver: i===1, bronze: i===2 }">{{ i+1 }}</span>
-              <span class="top-name">{{ u.name }}</span>
-              <span class="top-score">{{ u.score }} pts</span>
-              <span class="top-games">{{ u.games }} partidas</span>
-            </div>
+            <template v-else>
+              <div class="top-podium" v-if="topUsers.length >= 1">
+                <div v-for="(u, i) in topUsers.slice(0, Math.min(3, topUsers.length))" :key="u.name"
+                  class="podium-card" :class="['pos-' + (i+1)]">
+                  <span class="podium-medal">{{ ['🥇','🥈','🥉'][i] }}</span>
+                  <span class="podium-name">{{ u.name }}</span>
+                  <span class="podium-score">{{ u.score.toLocaleString() }} pts</span>
+                  <span class="podium-games">{{ u.games }} partida{{ u.games !== 1 ? 's' : '' }}</span>
+                </div>
+              </div>
+              <table class="stats-table" v-if="topUsers.length > 3">
+                <thead>
+                  <tr><th>#</th><th>Jugador</th><th class="th-num">Puntos</th><th class="th-num">Partidas</th><th class="th-num">Promedio</th></tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(u, i) in topUsers.slice(3)" :key="u.name" class="table-row">
+                    <td class="td-rank">{{ i + 4 }}</td>
+                    <td class="st-title">{{ u.name }}</td>
+                    <td class="td-num"><span class="score-text">{{ u.score.toLocaleString() }}</span></td>
+                    <td class="td-num">{{ u.games }}</td>
+                    <td class="td-num"><span class="avg-chip">{{ u.games ? Math.round(u.score / u.games).toLocaleString() : 0 }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
           </div>
         </div>
       </div>
@@ -250,21 +300,40 @@
       <div v-if="showHistoryModal" class="modal-overlay" @click.self="showHistoryModal = false">
         <div class="modal-card modal-wide">
           <div class="modal-header">
-            <h2>📅 Historial de Partidas</h2>
+            <div class="modal-header-left">
+              <span class="modal-icon">📅</span>
+              <div>
+                <h2>Historial de Partidas</h2>
+                <p class="modal-subtitle">Todas tus sesiones, más recientes primero</p>
+              </div>
+            </div>
             <button class="modal-close" @click="showHistoryModal = false">×</button>
           </div>
           <div class="stats-table-wrap">
             <table class="stats-table">
-              <thead><tr><th>Quiz</th><th>Código</th><th>Estado</th><th>Jugadores</th><th>Fecha</th></tr></thead>
-              <tbody>
-                <tr v-for="s in sessionsHistory" :key="s.code">
-                  <td class="st-title">{{ s.title }}</td>
-                  <td><span class="code-mono">{{ s.code }}</span></td>
-                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '22', color: statusColor(s.status) }">{{ statusLabel(s.status) }}</span></td>
-                  <td>{{ s.players?.length || 0 }}</td>
-                  <td>{{ formatDate(s.createdAt) }}</td>
+              <thead>
+                <tr>
+                  <th>Quiz</th>
+                  <th>Código</th>
+                  <th>Estado</th>
+                  <th class="th-num">Jugadores</th>
+                  <th class="th-num">Preguntas</th>
+                  <th>Fecha</th>
                 </tr>
-                <tr v-if="!sessionsHistory.length"><td colspan="5" class="empty-row">No hay historial aún</td></tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in sessionsHistory" :key="s.code" class="table-row">
+                  <td class="st-title">
+                    <span class="title-dot" :style="{ background: statusColor(s.status) }"></span>
+                    {{ s.title }}
+                  </td>
+                  <td><span class="code-badge">{{ s.code }}</span></td>
+                  <td><span class="status-pill" :style="{ background: statusColor(s.status) + '18', color: statusColor(s.status), borderColor: statusColor(s.status) + '44' }">{{ statusLabel(s.status) }}</span></td>
+                  <td class="td-num"><span class="num-chip players-chip">👥 {{ s.players?.length || 0 }}</span></td>
+                  <td class="td-num"><span class="num-chip questions-chip">❓ {{ s.questions?.length || 0 }}</span></td>
+                  <td class="td-date">{{ formatDate(s.createdAt) }}</td>
+                </tr>
+                <tr v-if="!sessionsHistory.length"><td colspan="6" class="empty-row"><span class="empty-icon">🐝</span> No hay historial aún</td></tr>
               </tbody>
             </table>
           </div>
@@ -279,9 +348,16 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import QuizAnalyticsModal from './QuizAnalyticsModal.vue'
+import { useAuthStore } from '../stores/auth.js'
 
 const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const router = useRouter()
+const authStore = useAuthStore()
+
+// Axios helper con token
+function authHeaders() {
+  return { headers: { Authorization: `Bearer ${authStore.token}` } }
+}
 
 const sessions = ref([])
 const loading = ref(true)
@@ -343,7 +419,7 @@ function handleEscape(e) {
 async function fetchSessions() {
   loading.value = true
   try {
-    const { data } = await axios.get(`${API}/api/sessions`)
+    const { data } = await axios.get(`${API}/api/sessions`, authHeaders())
     sessions.value = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
   } catch { /* silent */ }
   finally { loading.value = false }
@@ -362,7 +438,7 @@ async function createQuiz() {
   creating.value = true
   createError.value = ''
   try {
-    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() })
+    const { data } = await axios.post(`${API}/api/sessions/create`, { title: newTitle.value.trim() }, authHeaders())
     sessions.value.unshift(data)
     closeCreate()
     router.push(`/admin?code=${data.code}`)
@@ -398,7 +474,7 @@ async function doDelete() {
   if (!deleteTarget.value) return
   deleting.value = true
   try {
-    await axios.delete(`${API}/api/sessions/${deleteTarget.value.code}`)
+    await axios.delete(`${API}/api/sessions/${deleteTarget.value.code}`, authHeaders())
     sessions.value = sessions.value.filter(s => s.code !== deleteTarget.value.code)
     deleteTarget.value = null
   } catch { alert('Error al eliminar.') }
@@ -456,8 +532,12 @@ const sessionsHistory = computed(() =>
 .nav-item:hover, .nav-item.active { background: #f0fdf4; color: #16a34a; }
 .nav-icon { font-size: .9rem; }
 .sidebar-footer { padding: 1rem 1.2rem; border-top: 1px solid #e2e8f0; }
-.admin-chip { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: #64748b; }
-.admin-avatar { width: 28px; height: 28px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .8rem; font-weight: 700; }
+.admin-chip { display: flex; align-items: center; gap: .65rem; font-size: .85rem; color: #64748b; }
+.admin-avatar { width: 32px; height: 32px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .85rem; font-weight: 700; flex-shrink: 0; }
+.admin-info { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.admin-name { font-weight: 600; color: #0f172a; font-size: .83rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 130px; }
+.logout-btn { background: none; border: none; color: #94a3b8; font-size: .72rem; cursor: pointer; padding: 0; text-align: left; transition: color .15s; }
+.logout-btn:hover { color: #ef4444; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 2rem 2.5rem; gap: 1.5rem; }
 .topbar { display: flex; justify-content: space-between; align-items: flex-end; }
 .topbar-left { display: flex; align-items: baseline; gap: .75rem; }
@@ -633,15 +713,43 @@ h1 { font-size: 1.6rem; font-weight: 800; color: #0f172a; }
 .cards-leave-to { opacity: 0; transform: scale(0.95); }
 
 /* Table styles for modals */
-.modal-wide { max-width: 800px; }
-.stats-table-wrap { overflow-x: auto; }
-.stats-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-.stats-table th { text-align: left; padding: 0.75rem; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
-.stats-table td { padding: 0.75rem; border-bottom: 1px solid #f1f5f9; color: #334155; }
-.stats-table tr:hover td { background: #f8fafc; }
-.st-title { font-weight: 600; color: #0f172a; }
-.status-pill { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; }
-.empty-row { text-align: center; color: #94a3b8; padding: 2rem; }
+.modal-wide { max-width: 860px; }
+.modal-header-left { display: flex; align-items: center; gap: 0.85rem; }
+.modal-icon { font-size: 1.6rem; }
+.modal-subtitle { font-size: 0.78rem; color: #94a3b8; margin: 0; font-weight: 400; }
+.stats-table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid #e2e8f0; margin-top: 0.25rem; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+.stats-table thead { background: #f8fafc; }
+.stats-table th { text-align: left; padding: 0.7rem 1rem; border-bottom: 2px solid #e2e8f0; color: #64748b; font-weight: 700; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05rem; white-space: nowrap; }
+.th-num { text-align: center !important; }
+.stats-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+.table-row:last-child td { border-bottom: none; }
+.table-row:hover td { background: #f0fdf4; }
+.st-title { font-weight: 600; color: #0f172a; display: flex; align-items: center; gap: 0.5rem; max-width: 220px; }
+.title-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.code-badge { font-family: 'Courier New', monospace; letter-spacing: 0.1rem; background: #dcfce7; color: #16a34a; font-size: 0.78rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 6px; border: 1px solid #bbf7d0; }
+.status-pill { font-size: 0.72rem; padding: 0.25rem 0.65rem; border-radius: 20px; font-weight: 700; border: 1px solid transparent; white-space: nowrap; }
+.td-num { text-align: center; }
+.num-chip { font-size: 0.78rem; font-weight: 600; padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap; }
+.players-chip { background: #eff6ff; color: #3b82f6; }
+.questions-chip { background: #fef9c3; color: #a16207; }
+.td-date { color: #64748b; font-size: 0.82rem; white-space: nowrap; }
+.td-rank { color: #94a3b8; font-weight: 700; font-size: 0.85rem; width: 36px; }
+.score-text { font-weight: 700; color: #16a34a; }
+.avg-chip { background: #f1f5f9; color: #475569; font-size: 0.78rem; padding: 0.15rem 0.45rem; border-radius: 5px; font-weight: 600; }
+.empty-row { text-align: center; color: #94a3b8; padding: 2.5rem; font-size: 0.9rem; }
+
+/* Podium top 3 */
+.top-podium { display: flex; gap: 0.75rem; padding: 1.25rem 1rem; background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border-bottom: 1px solid #d1fae5; }
+.podium-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.25rem; background: #fff; border-radius: 12px; padding: 1rem 0.75rem; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,.06); transition: transform .15s; }
+.podium-card:hover { transform: translateY(-2px); }
+.pos-1 { border-color: #fde68a; background: linear-gradient(160deg, #fffbeb 0%, #fff 100%); }
+.pos-2 { border-color: #e2e8f0; background: linear-gradient(160deg, #f8fafc 0%, #fff 100%); }
+.pos-3 { border-color: #fecaca; background: linear-gradient(160deg, #fff5f5 0%, #fff 100%); }
+.podium-medal { font-size: 1.75rem; }
+.podium-name { font-weight: 700; color: #0f172a; font-size: 0.9rem; text-align: center; }
+.podium-score { font-weight: 800; color: #16a34a; font-size: 1.05rem; }
+.podium-games { font-size: 0.72rem; color: #94a3b8; }
 
 .top-users-list { display: flex; flex-direction: column; gap: 0.5rem; }
 .top-user-row { display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1rem; background: #f8fafc; border-radius: 8px; }
